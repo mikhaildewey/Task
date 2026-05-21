@@ -116,6 +116,10 @@ document.addEventListener("DOMContentLoaded", () => {
         initClockUtilities();
         setupDashboardInterfaceListeners();
         bindFeatureCardsToModals();
+
+        if (auth.currentUser) {
+            updateUserAccountUI(auth.currentUser);
+        }
     }
 });
 
@@ -125,11 +129,18 @@ document.addEventListener("DOMContentLoaded", () => {
 function updateUserAccountUI(user) {
     if (!user) return;
 
-    const username = user.email.split('@')[0];
-    const el = document.getElementById("userAccountName");
+    const emailText = user.email || "Account";
+    const username = user.email ? user.email.split('@')[0] : "User";
 
-    if (el) {
-        el.innerHTML = `
+    const userEmailEl = document.getElementById("userEmail");
+    const accountNameEl = document.getElementById("userAccountName");
+
+    if (userEmailEl) {
+        userEmailEl.textContent = emailText;
+    }
+
+    if (accountNameEl) {
+        accountNameEl.innerHTML = `
             <i class="fa-solid fa-user-circle mr-2 text-purple-400"></i>
             ${username}
         `;
@@ -353,6 +364,38 @@ function injectModularSystemInterfaces() {
     setupModuleSubmissionListeners();
 }
 
+function resetTaskModalState() {
+    const idInput = document.getElementById('modTaskId');
+    const titleInput = document.getElementById('modTaskTitle');
+    const categoryInput = document.getElementById('modTaskCategory');
+    const submitBtn = document.getElementById('modSubmitTaskBtn');
+    const modalTitle = document.getElementById('modTasksModalTitle');
+
+    if (idInput) idInput.value = '';
+    if (titleInput) titleInput.value = '';
+    if (categoryInput) categoryInput.value = 'Work';
+    if (submitBtn) submitBtn.textContent = 'Create Task';
+    if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-list-check text-emerald-400"></i> Create Task';
+}
+
+function openTaskModalForEdit(task) {
+    if (!task) return;
+
+    const idInput = document.getElementById('modTaskId');
+    const titleInput = document.getElementById('modTaskTitle');
+    const categoryInput = document.getElementById('modTaskCategory');
+    const submitBtn = document.getElementById('modSubmitTaskBtn');
+    const modalTitle = document.getElementById('modTasksModalTitle');
+
+    if (idInput) idInput.value = task.id;
+    if (titleInput) titleInput.value = task.title || '';
+    if (categoryInput) categoryInput.value = task.category || 'Work';
+    if (submitBtn) submitBtn.textContent = 'Save Changes';
+    if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-list-check text-emerald-400"></i> Edit Task';
+
+    openModal('modTasksModal');
+}
+
 // ======================================================
 // INTERFACE MODULE LOGIC SUBMISSIONS & BUTTON BINDINGS
 // ======================================================
@@ -366,6 +409,7 @@ function setupModuleSubmissionListeners() {
 
     // --- Submit Basic Task (My Tasks) ---
     document.getElementById('modSubmitTaskBtn').onclick = async () => {
+        const taskId = document.getElementById('modTaskId').value;
         const title = document.getElementById('modTaskTitle').value.trim();
         const category = document.getElementById('modTaskCategory').value;
 
@@ -375,20 +419,27 @@ function setupModuleSubmissionListeners() {
         }
 
         try {
-            await addDoc(collection(db, "tasks"), {
-                userEmail: auth.currentUser.email,
-                title: title,
-                category: category,
-                date: null,
-                time: null,
-                reminderDateTime: null,
-                reminderTriggered: false,
-                completed: false,
-                createdAt: new Date()
-            });
+            if (taskId) {
+                await updateDoc(doc(db, "tasks", taskId), {
+                    title: title,
+                    category: category
+                });
+            } else {
+                await addDoc(collection(db, "tasks"), {
+                    userEmail: auth.currentUser.email,
+                    title: title,
+                    category: category,
+                    date: null,
+                    time: null,
+                    reminderDateTime: null,
+                    reminderTriggered: false,
+                    completed: false,
+                    createdAt: new Date()
+                });
+            }
 
+            resetTaskModalState();
             closeModal('modTasksModal');
-            document.getElementById('modTaskTitle').value = ""; // Reset input
         } catch (err) {
             alert(err.message);
         }
@@ -567,13 +618,12 @@ function setupDashboardInterfaceListeners() {
                 alert("Login required.");
                 return;
             }
+            resetTaskModalState();
             openModal('modTasksModal');
         };
     }
 }
 
-// ======================================================
-// REALTIME CORE DATASTREAM TASKS FEED
 // ======================================================
 function setupRealtimeTasks(userEmail) {
     if (snapshotUnsubscribe) {
@@ -620,7 +670,10 @@ function setupRealtimeTasks(userEmail) {
                         </p>
                     </div>
                 </div>
-                <button data-id="${id}" class="delete-task-btn text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Remove</button>
+                <div class="flex items-center gap-2">
+                    <button data-id="${id}" class="edit-task-btn text-xs font-semibold bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Edit</button>
+                    <button data-id="${id}" class="delete-task-btn text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Remove</button>
+                </div>
             `;
             taskList.appendChild(row);
         });
@@ -652,6 +705,15 @@ function attachDynamicItemListeners() {
             } catch (err) {
                 console.error(err);
             }
+        };
+    });
+
+    document.querySelectorAll('.edit-task-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            const id = e.target.getAttribute('data-id');
+            const task = cachedTasksArray.find(item => item.id === id);
+            if (!task) return;
+            openTaskModalForEdit(task);
         };
     });
 

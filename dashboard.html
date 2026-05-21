@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Task Scheduler - Dashboard</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script type="module" src="app.js"></script>
@@ -12,8 +14,8 @@
 
     <div class="md:hidden bg-[#151722] p-4 flex justify-between items-center border-b border-[#2A2D3E] z-50">
         <div class="flex items-center space-x-2">
-            <div class="h-8 w-8 bg-gradient-to-br from-[#7B51D3] to-[#5531A6] rounded-lg flex items-center justify-center">
-                <i class="fa-solid fa-clipboard-check text-white text-sm"></i>
+            <div class="h-8 w-8 rounded-lg overflow-hidden bg-white/10 flex items-center justify-center">
+                <img src="logo.png" alt="Smart Scheduler" class="h-full w-full object-cover">
             </div>
             <span class="font-bold text-lg">Smart Scheduler</span>
         </div>
@@ -24,8 +26,8 @@
 
     <aside id="sidebar" class="fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-[#151722] border-r border-[#2A2D3E] flex flex-col p-4 z-40 h-full">
         <div class="hidden md:flex items-center space-x-3 mb-8 px-2">
-            <div class="h-10 w-10 bg-gradient-to-br from-[#7B51D3] to-[#5531A6] rounded-lg flex items-center justify-center">
-                <i class="fa-solid fa-clipboard-check text-white"></i>
+            <div class="h-10 w-10 rounded-lg overflow-hidden bg-white/10 flex items-center justify-center">
+                <img src="logo.png" alt="Smart Scheduler" class="h-full w-full object-cover">
             </div>
             <h2 class="text-xl font-bold tracking-tight">Smart Scheduler</h2>
         </div>
@@ -133,11 +135,12 @@
     <div id="modTasksModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60] transition-all duration-300 opacity-0 pointer-events-none">
         <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md p-6 transform scale-95 transition-all duration-300">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                <h3 id="modTasksModalTitle" class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-list-check text-emerald-400"></i> Create Task
                 </h3>
                 <button onclick="closeModal('modTasksModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
+            <input type="hidden" id="modTaskId" value="">
             <input type="text" id="modTaskTitle" placeholder="Enter task objective..." class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
             <select id="modTaskCategory" class="w-full mb-6 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
                 <option value="Work">Work</option>
@@ -183,7 +186,7 @@
                 <h3 class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-bell text-amber-400"></i> Active Reminders
                 </h3>
-                <button id="closeRemindersBtn" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeRemindersBtn" type="button" onclick="closeModal('modRemindersModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="modRemindersList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
                 No active reminders currently.
@@ -200,7 +203,7 @@
                 <h3 class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-inbox text-blue-400"></i> Inbox Logs
                 </h3>
-                <button id="closeInboxBtn" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeInboxBtn" type="button" onclick="closeModal('modInboxModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="modInboxList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
                 No new notifications.
@@ -248,13 +251,30 @@
             };
 
             // Bind the feature cards to their respective modals
-            bindTrigger('featureCardTasks', 'modTasksModal');
-            bindTrigger('featureCardCalendar', 'modCalendarModal');
-            bindTrigger('featureCardReminders', 'modRemindersModal');
-            bindTrigger('featureCardInbox', 'modInboxModal');
+            const bindCard = (triggerId, modalId) => {
+                const trigger = document.getElementById(triggerId);
+                if (trigger) {
+                    trigger.addEventListener('click', () => {
+                        if (triggerId === 'featureCardTasks') {
+                            if (typeof resetTaskModalState === 'function') resetTaskModalState();
+                        }
+                        openModal(modalId);
+                    });
+                }
+            };
+            bindCard('featureCardTasks', 'modTasksModal');
+            bindCard('featureCardCalendar', 'modCalendarModal');
+            bindCard('featureCardReminders', 'modRemindersModal');
+            bindCard('featureCardInbox', 'modInboxModal');
             
             // Also bind the "Add Task" button on the priority board to the tasks modal
-            bindTrigger('addTaskBtn', 'modTasksModal');
+            const addTaskBtn = document.getElementById('addTaskBtn');
+            if (addTaskBtn) {
+                addTaskBtn.addEventListener('click', () => {
+                    if (typeof resetTaskModalState === 'function') resetTaskModalState();
+                    openModal('modTasksModal');
+                });
+            }
             
             // Bind close buttons for Reminders & Inbox modals
             const closeRemindersBtn = document.getElementById('closeRemindersBtn');
