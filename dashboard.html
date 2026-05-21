@@ -183,7 +183,7 @@
                 <h3 class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-bell text-amber-400"></i> Active Reminders
                 </h3>
-                <button onclick="closeModal('modRemindersModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeRemindersBtn" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="modRemindersList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
                 No active reminders currently.
@@ -200,7 +200,7 @@
                 <h3 class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-inbox text-blue-400"></i> Inbox Logs
                 </h3>
-                <button onclick="closeModal('modInboxModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeInboxBtn" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="modInboxList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
                 No new notifications.
@@ -255,6 +255,12 @@
             
             // Also bind the "Add Task" button on the priority board to the tasks modal
             bindTrigger('addTaskBtn', 'modTasksModal');
+            
+            // Bind close buttons for Reminders & Inbox modals
+            const closeRemindersBtn = document.getElementById('closeRemindersBtn');
+            if (closeRemindersBtn) closeRemindersBtn.addEventListener('click', () => window.closeModal('modRemindersModal'));
+            const closeInboxBtn = document.getElementById('closeInboxBtn');
+            if (closeInboxBtn) closeInboxBtn.addEventListener('click', () => window.closeModal('modInboxModal'));
         });
     </script>
 </body>
