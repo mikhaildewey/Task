@@ -4,7 +4,7 @@ import {
     onAuthStateChanged, signOut 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
-    getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc 
+    getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ==========================================
@@ -28,7 +28,7 @@ let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
 let cachedTasksArray = []; 
 
-// Runtime variable space to track active OTP generation validations
+// Runtime variable space to track active 2FA parameters
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
 
@@ -40,24 +40,28 @@ const logoutBtn = document.getElementById('logoutBtn');
 // --- CENTRAL AUTH STATE ROUTER PIPELINE ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        if (loginBtn || createAccBtn) {
+        // Safe navigation logic to prevent circular routing traps
+        const currentPath = window.location.pathname.toLowerCase();
+        if (currentPath.includes("login.html") || currentPath.endsWith("/")) {
             window.location.replace("dashboard.html");
-        } 
+        }
+        
         if (addTaskBtn) {
             const emailDisplay = document.getElementById('userEmail') || document.querySelector('.text-sm.text-gray-400');
             if (emailDisplay) emailDisplay.textContent = user.email;
             initClockUtilities();
-            setupRealtimeTasks();
+            setupRealtimeTasks(user.email); // CRITICAL: Only retrieve tasks belonging to this user
             setupDashboardInterfaceListeners();
             injectDynamicFeatureModals(); 
         }
     } else {
-        if (addTaskBtn || logoutBtn) {
+        const currentPath = window.location.pathname.toLowerCase();
+        if (currentPath.includes("dashboard.html")) {
             window.location.replace("./LOGIN.html");
         }
         if (loginBtn || createAccBtn) {
             setupLoginInterfaceListeners();
-            setupOtpInputsBehavior(); // Bind auto-focus inputs logic
+            setupOtpInputsBehavior(); 
         }
     }
 });
@@ -102,7 +106,6 @@ function injectDynamicFeatureModals() {
     };
 }
 
-// --- OPEN AND POPULATE DASHBOARD PANEL MODALS ---
 function triggerFeatureView(featureType) {
     const modal = document.getElementById('utilityModal');
     const titleEl = document.getElementById('utilityModalTitle');
@@ -163,17 +166,9 @@ function triggerFeatureView(featureType) {
                     </div>
                     <p class="text-[11px] text-gray-300">Firestore streaming connection running successfully. Active logs cache initialized properly.</p>
                 </div>
-                <div class="bg-[#1A1C28] p-3 rounded-xl border border-[#2A2D3E] opacity-70">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-xs font-bold text-purple-400">Security Guardrail</span>
-                        <span class="text-[9px] text-gray-500">10m ago</span>
-                    </div>
-                    <p class="text-[11px] text-gray-300">Rate-limiting monitors updated to reject extraneous trailing white-space entries safely.</p>
-                </div>
             </div>
         `;
     }
-
     modal.classList.remove('hidden'); 
 }
 
@@ -187,7 +182,6 @@ function setupDashboardInterfaceListeners() {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // 1. Home Buttons Configuration
     ['sideNavHome'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.onclick = () => {
@@ -196,31 +190,26 @@ function setupDashboardInterfaceListeners() {
         };
     });
 
-    // 2. Task Manager Focusing Path Configuration
     ['sideNavTasks', 'featureCardTasks'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.onclick = () => jumpToSection(targetBoard);
     });
 
-    // 3. Calendar UI Path Mapping
     ['sideNavCalendar', 'featureCardCalendar'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.onclick = () => triggerFeatureView('Calendar');
     });
 
-    // 4. Reminders System Path Mapping
     ['sideNavReminders', 'featureCardReminders'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.onclick = () => triggerFeatureView('Reminders');
     });
 
-    // 5. Inbox Feed Path Mapping
     ['sideNavInbox', 'featureCardInbox'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) btn.onclick = () => triggerFeatureView('Inbox');
     });
 
-    // Mobile Navigation Burger Controller Layout Handling
     if (mobileMenuBtn && sidebar) {
         mobileMenuBtn.onclick = (e) => {
             e.stopPropagation();
@@ -231,14 +220,19 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
+    // --- FIX: ABSOLUTE SHUTDOWN LOGOUT ROUTER LINK ---
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
+                if (snapshotUnsubscribe) {
+                    snapshotUnsubscribe();
+                    snapshotUnsubscribe = null;
+                }
                 await signOut(auth);
                 window.location.replace("./LOGIN.html");
             } catch (err) {
-                console.error("Logout navigation block:", err);
-                window.location.assign("./LOGIN.html");
+                console.error("Logout navigation failure:", err);
+                window.location.href = "./LOGIN.html";
             }
         };
     }
@@ -247,7 +241,7 @@ function setupDashboardInterfaceListeners() {
     if (searchInput) {
         searchInput.oninput = (e) => {
             currentSearchQuery = e.target.value.toLowerCase().trim();
-            setupRealtimeTasks(); 
+            if (auth.currentUser) setupRealtimeTasks(auth.currentUser.email); 
         };
     }
 
@@ -263,7 +257,7 @@ function setupDashboardInterfaceListeners() {
                 });
                 btn.classList.add('bg-[#252836]', 'text-white');
                 btn.classList.remove('text-gray-400');
-                setupRealtimeTasks();
+                if (auth.currentUser) setupRealtimeTasks(auth.currentUser.email);
             };
         }
     });
@@ -280,7 +274,9 @@ function setupDashboardInterfaceListeners() {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             try {
+                // ADDED: Saving the task with the creator's logged-in email identifier
                 await addDoc(collection(db, "tasks"), {
+                    userEmail: auth.currentUser.email, 
                     title: title.trim(),
                     category: finalCategory,
                     time: timeStr,
@@ -295,13 +291,19 @@ function setupDashboardInterfaceListeners() {
 }
 
 // --- DATA READ QUERY RENDERING PIPELINE STREAM ---
-function setupRealtimeTasks() {
+// MODIFIED: Takes the current user's email to fetch and isolate their unique data partition
+function setupRealtimeTasks(userEmail) {
     if (snapshotUnsubscribe) snapshotUnsubscribe(); 
 
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
-    const q = query(collection(db, "tasks"), orderBy("createdAt", "desc"));
+    // SECURE FIX: Using Firestore 'where' clause to isolate tasks to the individual user
+    const q = query(
+        collection(db, "tasks"), 
+        where("userEmail", "==", userEmail),
+        orderBy("createdAt", "desc")
+    );
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
         taskList.innerHTML = '';
@@ -350,9 +352,11 @@ function setupRealtimeTasks() {
         if (badgeTasks) badgeTasks.textContent = pendingCount;
 
         if (taskList.children.length === 0) {
-            taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No matching priority items found.</p>`;
+            taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
         }
         attachDynamicItemListeners();
+    }, (error) => {
+        console.error("Firestore loading error. Check if Index is deploying:", error);
     });
 }
 
@@ -377,25 +381,23 @@ function attachDynamicItemListeners() {
     });
 }
 
-// --- PREMIUM AUTO-FOCUS INTERACTION FOR 6-BOX OTP OVERLAY ---
+// --- OTP FIELD NAVIGATION ROUTINES ---
 function setupOtpInputsBehavior() {
     const boxes = document.querySelectorAll('.otp-box');
     boxes.forEach((box, idx) => {
         box.oninput = (e) => {
-            // Force numeric filters only
             box.value = box.value.replace(/[^0-9]/g, '');
             if (box.value.length === 1 && idx < boxes.length - 1) {
-                boxes[idx + 1].focus(); // Advance cursor forward on keystroke
+                boxes[idx + 1].focus(); 
             }
         };
         box.onkeydown = (e) => {
             if (e.key === "Backspace" && box.value.length === 0 && idx > 0) {
-                boxes[idx - 1].focus(); // Recede cursor back on clearing character
+                boxes[idx - 1].focus(); 
             }
         };
     });
 
-    // Close OTP Modal trigger
     const cancelOtpBtn = document.getElementById('cancelOtpBtn');
     if (cancelOtpBtn) {
         cancelOtpBtn.onclick = () => {
@@ -406,7 +408,6 @@ function setupOtpInputsBehavior() {
         };
     }
 
-    // Process secure verification evaluation
     const verifyOtpBtn = document.getElementById('verifyOtpBtn');
     if (verifyOtpBtn) {
         verifyOtpBtn.onclick = async () => {
@@ -414,14 +415,13 @@ function setupOtpInputsBehavior() {
             boxes.forEach(b => combinedUserEntry += b.value);
 
             if (combinedUserEntry.length !== 6) {
-                return alert("Please enter the complete 6-digit confirmation key code.");
+                return alert("Please enter the complete 6-digit verification code.");
             }
 
             if (combinedUserEntry === String(systemGeneratedOtp)) {
-                // Success path! Authenticate with Firebase Auth
                 try {
-                    const verifyOtpBtn = document.getElementById('verifyOtpBtn');
-                    verifyOtpBtn.textContent = "Activating Profile...";
+                    verifyOtpBtn.textContent = "Verifying...";
+                    verifyOtpBtn.disabled = true;
                     
                     if (pendingRegistrationData.mode === 'create') {
                         await createUserWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
@@ -432,17 +432,19 @@ function setupOtpInputsBehavior() {
                     document.getElementById('otpModal').classList.add('hidden');
                     boxes.forEach(b => b.value = '');
                 } catch (error) {
-                    alert("Authorization Error: " + error.message);
+                    alert("Authentication Failed: " + error.message);
+                } finally {
                     verifyOtpBtn.textContent = "Verify Securely";
+                    verifyOtpBtn.disabled = false;
                 }
             } else {
-                alert("Incorrect Security OTP. Please re-check the issued authorization session key.");
+                alert("Incorrect Security OTP. Please re-check your email.");
             }
         };
     }
 }
 
-// --- SIGN IN & SIGN UP OVERLAY LISTENERS ---
+// --- LOGIN INTERFACE EVENT BINDINGS ---
 function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -462,6 +464,33 @@ function setupLoginInterfaceListeners() {
         }
     }
 
+    // UTILITY: Dispatches the real OTP email using the EmailJS integration
+    const sendOtpViaEmail = (recipientEmail, otpCode, actionButton) => {
+        // --- CONFIGURE YOUR ACCOUNT IDs HERE ---
+        const SERVICE_ID = "YOUR_EMAILJS_SERVICE_ID"; 
+        const TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
+
+        const templateParams = {
+            to_email: recipientEmail,
+            otp_code: otpCode
+        };
+
+        emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
+            .then(() => {
+                alert(`A secure verification code has been dispatched to ${recipientEmail}. Please check your inbox or spam folder.`);
+                document.getElementById('otpModal').classList.remove('hidden');
+                const firstBox = document.querySelector('.otp-box');
+                if (firstBox) firstBox.focus();
+            })
+            .catch((err) => {
+                alert("Failed to send verification email. Error details: " + JSON.stringify(err));
+            })
+            .finally(() => {
+                actionButton.textContent = pendingRegistrationData.mode === 'create' ? "Create Account" : "Login";
+                actionButton.disabled = false;
+            });
+    };
+
     if (createAccBtn) {
         const newCreateBtn = createAccBtn.cloneNode(true); createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
         newCreateBtn.onclick = (e) => {
@@ -471,17 +500,13 @@ function setupLoginInterfaceListeners() {
             if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
             if (cleanPassword.length < 6) return alert("Password must be at least 6 characters long.");
 
-            // 1. Generate Secure 6-Digit Verification Token
+            newCreateBtn.textContent = "Sending Email Verification...";
+            newCreateBtn.disabled = true;
+
             systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
             pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'create' };
 
-            // 2. Display verification code safely and securely inside system dialog alert
-            alert(`[SECURITY ALERT] Your SmartTask account activation OTP is: ${systemGeneratedOtp}`);
-
-            // 3. Open OTP panel overlay and set programmatic window focus
-            document.getElementById('otpModal').classList.remove('hidden');
-            const firstBox = document.querySelector('.otp-box');
-            if (firstBox) firstBox.focus();
+            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, newCreateBtn);
         };
     }
 
@@ -492,15 +517,13 @@ function setupLoginInterfaceListeners() {
             const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
             if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
 
-            // Intercepting login path with identical two-factor simulation security step
+            newLoginBtn.textContent = "Sending Login Code...";
+            newLoginBtn.disabled = true;
+
             systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
             pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'login' };
 
-            alert(`[SECURITY VERIFICATION] Your 2FA account authorization login OTP code is: ${systemGeneratedOtp}`);
-
-            document.getElementById('otpModal').classList.remove('hidden');
-            const firstBox = document.querySelector('.otp-box');
-            if (firstBox) firstBox.focus();
+            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, newLoginBtn);
         };
     }
 }
