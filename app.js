@@ -50,6 +50,7 @@ setPersistence(auth, browserLocalPersistence)
 let snapshotUnsubscribe = null;
 let cachedTasksArray = [];
 let reminderCheckInterval = null;
+let submitTaskInProgress = false;
 
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
@@ -435,12 +436,18 @@ function setupModuleSubmissionListeners() {
     const modSubmitTaskBtn = document.getElementById('modSubmitTaskBtn');
     if (modSubmitTaskBtn) {
         modSubmitTaskBtn.onclick = async () => {
+            if (submitTaskInProgress) return;
+            submitTaskInProgress = true;
+            modSubmitTaskBtn.disabled = true;
+
             const taskId = document.getElementById('modTaskId').value;
             const title = document.getElementById('modTaskTitle').value.trim();
             const category = document.getElementById('modTaskCategory').value;
 
             if (!title) {
                 alert("Task objective cannot be blank.");
+                submitTaskInProgress = false;
+                modSubmitTaskBtn.disabled = false;
                 return;
             }
 
@@ -488,6 +495,9 @@ function setupModuleSubmissionListeners() {
                 refreshTaskDisplay();
             } catch (err) {
                 alert(err.message);
+            } finally {
+                submitTaskInProgress = false;
+                modSubmitTaskBtn.disabled = false;
             }
         };
     }
