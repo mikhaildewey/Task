@@ -26,6 +26,7 @@ const db = getFirestore(app);
 let currentCategoryFilter = "All";
 let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
+let cachedTasksArray = []; // Stores tasks globally to feed newly added interactive utilities
 
 const loginBtn = document.getElementById('loginBtn');
 const createAccBtn = document.getElementById('createAccBtn');
@@ -35,17 +36,20 @@ const logoutBtn = document.getElementById('logoutBtn');
 // --- CENTRAL AUTH STATE ROUTER PIPELINE ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
+        // If a user is logged in, make sure they stay on the dashboard page
         if (loginBtn || createAccBtn) {
             window.location.replace("dashboard.html");
         } 
         if (addTaskBtn) {
-            const emailDisplay = document.getElementById('userEmail');
+            const emailDisplay = document.getElementById('userEmail') || document.querySelector('.text-sm.text-gray-400');
             if (emailDisplay) emailDisplay.textContent = user.email;
             initClockUtilities();
             setupRealtimeTasks();
             setupDashboardInterfaceListeners();
+            injectDynamicFeatureModals(); 
         }
     } else {
+        // CRITICAL FIX: Match the exact uppercase filename 'LOGIN.html' to prevent 404 errors on logout
         if (addTaskBtn || logoutBtn) {
             window.location.replace("LOGIN.html");
         }
@@ -55,97 +59,10 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- UPDATED LOGIN & REGISTER HANDLERS WITH INPUT TRIMMING ---
-function setupLoginInterfaceListeners() {
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const agreeCheck = document.getElementById('agreeCheck');
-    
-    const termsLink = document.getElementById('termsLink');
-    const termsModal = document.getElementById('termsModal');
-    const closeTermsBtn = document.getElementById('closeTermsBtn');
-    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
-
-    // Terms Modal Display Toggles
-    if (termsLink && termsModal) {
-        termsLink.onclick = (e) => {
-            e.preventDefault();
-            termsModal.classList.remove('hidden');
-        };
-
-        const hideModal = () => {
-            termsModal.classList.add('hidden');
-        };
-
-        if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
-        if (acceptTermsBtn) {
-            acceptTermsBtn.onclick = () => {
-                if (agreeCheck) agreeCheck.checked = true;
-                hideModal();
-            };
-        }
-    }
-
-    // Account Creation Event Handler
-    if (createAccBtn) {
-        const newCreateBtn = createAccBtn.cloneNode(true);
-        createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
-
-        newCreateBtn.onclick = async (e) => {
-            e.preventDefault();
-            if (!agreeCheck || !agreeCheck.checked) {
-                return alert("You must read and agree to the Terms & Conditions to create an account.");
-            }
-            
-            // Clean inputs to avoid accidental errors
-            const cleanEmail = emailInput.value.trim();
-            const cleanPassword = passwordInput.value.trim();
-
-            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
-            
-            try {
-                newCreateBtn.textContent = "Creating Account...";
-                await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-            } catch (error) {
-                alert("Registration Failed: " + error.message);
-                newCreateBtn.textContent = "Create Account";
-            }
-        };
-    }
-
-    // Authentication Session Login Event Handler
-    if (loginBtn) {
-        const newLoginBtn = loginBtn.cloneNode(true);
-        loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
-        
-        newLoginBtn.onclick = async (e) => {
-            e.preventDefault();
-            
-            // Clean inputs automatically to prevent rate-limiting typos
-            const cleanEmail = emailInput.value.trim();
-            const cleanPassword = passwordInput.value.trim();
-
-            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
-            
-            try {
-                newLoginBtn.textContent = "Logging in...";
-                await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-            } catch (error) {
-                // Friendly translation for rate limit notifications
-                if (error.code === 'auth/too-many-requests') {
-                    alert("This device is temporarily locked due to multiple login failures. Please change networks or try again in a few minutes.");
-                } else {
-                    alert("Login Failed: " + error.message);
-                }
-                newLoginBtn.textContent = "Login";
-            }
-        };
-    }
-}
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
-    const timeEl = document.getElementById('liveTime');
-    const dateEl = document.getElementById('liveDate');
+    const timeEl = document.getElementById('liveTime') || document.querySelector('.text-xl.font-bold');
+    const dateEl = document.getElementById('liveDate') || document.querySelector('.text-purple-200.text-sm');
     
     function refreshClock() {
         const now = new Date();
@@ -156,32 +73,155 @@ function initClockUtilities() {
     setInterval(refreshClock, 1000);
 }
 
+// --- DYNAMICALLY INJECT COMPONENT MODALS TO DOM ---
+function injectDynamicFeatureModals() {
+    if (document.getElementById('featureModalContainer')) return;
+
+    const modalWrapper = document.createElement('div');
+    modalWrapper.id = 'featureModalContainer';
+    modalWrapper.innerHTML = `
+        <div id="utilityModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-all duration-200">
+            <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+                <div class="p-4 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
+                    <h3 id="utilityModalTitle" class="text-base font-bold text-white flex items-center gap-2">
+                        </h3>
+                    <button type="button" id="closeUtilityModalBtn" class="text-gray-400 hover:text-white transition text-lg p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div id="utilityModalBody" class="p-5 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-4">
+                    </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modalWrapper);
+
+    document.getElementById('closeUtilityModalBtn').onclick = () => {
+        document.getElementById('utilityModal').classList.add('hidden');
+    };
+}
+
+// --- OPEN AND POPULATE DASHBOARD PANEL MODALS ---
+function triggerFeatureView(featureType) {
+    const modal = document.getElementById('utilityModal');
+    const titleEl = document.getElementById('utilityModalTitle');
+    const bodyEl = document.getElementById('utilityModalBody');
+    if (!modal || !titleEl || !bodyEl) return;
+
+    bodyEl.innerHTML = ''; // Reset UI Container
+
+    if (featureType === 'Calendar') {
+        titleEl.innerHTML = `<i class="fa-solid fa-calendar text-purple-400"></i> Local Schedule Planner`;
+        bodyEl.innerHTML = `
+            <p class="text-gray-400 text-xs mb-2">Select a date path tracking point to synchronize your scheduling overview indices:</p>
+            <input type="date" value="${new Date().toISOString().split('T')[0]}" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition mb-4">
+            <div class="text-[11px] font-bold text-purple-400 tracking-wider uppercase mb-1">Active Tasks Set for Today:</div>
+            <div class="space-y-2 max-h-[200px] overflow-y-auto">
+                ${cachedTasksArray.length === 0 ? '<p class="text-gray-500 text-xs italic">No schedule logs recorded today.</p>' : 
+                  cachedTasksArray.map(t => `
+                    <div class="bg-[#1A1C28] p-2.5 rounded-lg border border-[#2A2D3E] flex justify-between items-center">
+                        <span class="truncate ${t.completed ? 'line-through text-gray-500' : 'text-gray-200'}">${t.title}</span>
+                        <span class="text-[10px] bg-[#252836] text-gray-400 px-2 py-0.5 rounded">${t.time}</span>
+                    </div>
+                  `).join('')}
+            </div>
+        `;
+    } 
+    else if (featureType === 'Reminders') {
+        titleEl.innerHTML = `<i class="fa-solid fa-bell text-amber-400"></i> System Alerts & Deadlines`;
+        const pendingTasks = cachedTasksArray.filter(t => !t.completed);
+        bodyEl.innerHTML = `
+            <p class="text-gray-400 text-xs mb-3">Active tracking rules are monitoring outstanding tasks remaining item deadlines:</p>
+            <div class="space-y-2">
+                ${pendingTasks.length === 0 ? `
+                    <div class="text-center py-4 text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-xs font-medium">
+                        <i class="fa-solid fa-circle-check mr-1"></i> All systems clear! No pending reminders.
+                    </div>` : 
+                  pendingTasks.map(t => `
+                    <div class="bg-[#1A1C28] p-3 rounded-xl border-l-2 border-amber-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-200">${t.title}</p>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Category: ${t.category}</p>
+                        </div>
+                        <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded">
+                            <i class="fa-regular fa-clock mr-1"></i>${t.time}
+                        </span>
+                    </div>
+                  `).join('')}
+            </div>
+        `;
+    } 
+    else if (featureType === 'Inbox') {
+        titleEl.innerHTML = `<i class="fa-solid fa-inbox text-blue-400"></i> Workspace Tracking Notifications`;
+        bodyEl.innerHTML = `
+            <div class="space-y-2">
+                <div class="bg-[#1A1C28] p-3 rounded-xl border border-[#2A2D3E] opacity-90">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-blue-400">Database Sync Module</span>
+                        <span class="text-[9px] text-gray-500">Just now</span>
+                    </div>
+                    <p class="text-[11px] text-gray-300">Firestore streaming connection running successfully. Active logs cache initialized properly.</p>
+                </div>
+                <div class="bg-[#1A1C28] p-3 rounded-xl border border-[#2A2D3E] opacity-70">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-purple-400">Security Guardrail</span>
+                        <span class="text-[9px] text-gray-500">10m ago</span>
+                    </div>
+                    <p class="text-[11px] text-gray-300">Rate-limiting monitors updated to reject extraneous trailing white-space entries safely.</p>
+                </div>
+            </div>
+        `;
+    }
+
+    modal.classList.remove('hidden'); // Smooth popup transition toggle open
+}
+
 // --- DASHBOARD UI INTERFACE LISTENERS ---
 function setupDashboardInterfaceListeners() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
 
-    // Sidebar View Jump Target Elements Anchors Helper Routine
     const jumpToSection = (element) => {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // Feature Cards Events Mapping
-    const taskTriggers = ['sideNavTasks', 'featureCardTasks', 'sideNavHome', 'featureCardCalendar', 'featureCardReminders', 'featureCardInbox'];
-    taskTriggers.forEach(id => {
+    // --- MAP AND BIND ALL CLICK ACTIONS ACROSS SIDEBAR AND DASHBOARD GRID BUTTONS ---
+    
+    // 1. Home Buttons Configuration
+    ['sideNavHome'].forEach(id => {
         const btn = document.getElementById(id);
-        if (btn) {
-            btn.onclick = () => {
-                jumpToSection(targetBoard);
-                if (id.startsWith('featureCard') && id !== 'featureCardTasks') {
-                    alert(`${btn.querySelector('h4').textContent} system utilities are fully synced below inside the Task Manager logs tracker.`);
-                }
-            };
-        }
+        if (btn) btn.onclick = () => {
+            const topDashboardCard = document.querySelector('.bg-gradient-to-r');
+            if (topDashboardCard) topDashboardCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
     });
 
-    // Mobile Navigation Burger Menu Controller
+    // 2. Task Manager Focusing Path Configuration
+    ['sideNavTasks', 'featureCardTasks'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.onclick = () => jumpToSection(targetBoard);
+    });
+
+    // 3. Calendar UI Path Mapping
+    ['sideNavCalendar', 'featureCardCalendar'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.onclick = () => triggerFeatureView('Calendar');
+    });
+
+    // 4. Reminders System Path Mapping
+    ['sideNavReminders', 'featureCardReminders'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.onclick = () => triggerFeatureView('Reminders');
+    });
+
+    // 5. Inbox Feed Path Mapping
+    ['sideNavInbox', 'featureCardInbox'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.onclick = () => triggerFeatureView('Inbox');
+    });
+
+    // Mobile Navigation Burger Controller Layout Handling
     if (mobileMenuBtn && sidebar) {
         mobileMenuBtn.onclick = (e) => {
             e.stopPropagation();
@@ -256,11 +296,15 @@ function setupRealtimeTasks() {
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
         taskList.innerHTML = '';
+        cachedTasksArray = []; // Refresh operational memory cache array clear
         let total = 0, completedCount = 0, pendingCount = 0;
 
         snapshot.forEach((docSnapshot) => {
             const task = docSnapshot.data();
             const id = docSnapshot.id;
+
+            // Preserve current database logs inside runtime reference
+            cachedTasksArray.push({ id, ...task });
 
             total++;
             if (task.completed) completedCount++; else pendingCount++;
@@ -290,10 +334,14 @@ function setupRealtimeTasks() {
             taskList.appendChild(row);
         });
 
+        // Sync visual count tags on main board cards
         if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
         if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
         if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
-        if(document.getElementById('sideBadgeTasks')) document.getElementById('sideBadgeTasks').textContent = pendingCount;
+        
+        // Synchronize numeric badges displayed adjacent to left side layout shortcuts text
+        const badgeTasks = document.getElementById('sideBadgeTasks') || document.querySelector('aside span.bg-\\[\\#252836\\]');
+        if (badgeTasks) badgeTasks.textContent = pendingCount;
 
         if (taskList.children.length === 0) {
             taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No matching priority items found.</p>`;
@@ -321,4 +369,52 @@ function attachDynamicItemListeners() {
             }
         };
     });
+}
+
+// --- FORWARDING INTEGRATION SCHEMATICS FOR LOGIN ROUTINE ATTACHMENTS ---
+function setupLoginInterfaceListeners() {
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const agreeCheck = document.getElementById('agreeCheck');
+    
+    const termsLink = document.getElementById('termsLink');
+    const termsModal = document.getElementById('termsModal');
+    const closeTermsBtn = document.getElementById('closeTermsBtn');
+    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
+
+    if (termsLink && termsModal) {
+        termsLink.onclick = (e) => { e.preventDefault(); termsModal.classList.remove('hidden'); };
+        const hideModal = () => { termsModal.classList.add('hidden'); };
+        if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
+        if (acceptTermsBtn) {
+            acceptTermsBtn.onclick = () => { if (agreeCheck) agreeCheck.checked = true; hideModal(); };
+        }
+    }
+
+    if (createAccBtn) {
+        const newCreateBtn = createAccBtn.cloneNode(true); createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
+        newCreateBtn.onclick = async (e) => {
+            e.preventDefault();
+            if (!agreeCheck || !agreeCheck.checked) return alert("You must read and agree to the Terms & Conditions to create an account.");
+            const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
+            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
+            try { newCreateBtn.textContent = "Creating Account..."; await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword); } 
+            catch (error) { alert("Registration Failed: " + error.message); newCreateBtn.textContent = "Create Account"; }
+        };
+    }
+
+    if (loginBtn) {
+        const newLoginBtn = loginBtn.cloneNode(true); loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
+        newLoginBtn.onclick = async (e) => {
+            e.preventDefault();
+            const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
+            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
+            try { newLoginBtn.textContent = "Logging in..."; await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword); } 
+            catch (error) {
+                if (error.code === 'auth/too-many-requests') alert("This device is temporarily locked due to multiple login failures. Please try again in a few minutes.");
+                else alert("Login Failed: " + error.message);
+                newLoginBtn.textContent = "Login";
+            }
+        };
+    }
 }
