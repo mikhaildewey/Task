@@ -55,39 +55,38 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- LOGIN & REGISTER CONTROL HANDLERS (WITH TERMS CONSTRAINTS) ---
+// Locate this inside your app.js file to ensure it aligns perfectly:
 function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const agreeCheck = document.getElementById('agreeCheck');
     
-    // Modal Element Pointers
     const termsLink = document.getElementById('termsLink');
     const termsModal = document.getElementById('termsModal');
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
-    // Modal Interaction Control Pipeline
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => {
             e.preventDefault();
-            termsModal.classList.remove('hidden');
-            setTimeout(() => termsModal.classList.add('opacity-100'), 10);
+            termsModal.classList.remove('hidden'); // Opens instantly on mobile phones
         };
 
         const hideModal = () => {
-            termsModal.classList.remove('opacity-100');
-            setTimeout(() => termsModal.classList.add('hidden'), 300);
+            termsModal.classList.add('hidden');
         };
 
         if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
+        
         if (acceptTermsBtn) {
             acceptTermsBtn.onclick = () => {
-                if (agreeCheck) agreeCheck.checked = true;
+                if (agreeCheck) agreeCheck.checked = true; // Auto-checks your HTML form wrapper box!
                 hideModal();
             };
         }
     }
+    // ... rest of your authentication code block follows
+}
 
     // Account Creation Event Handler
     if (createAccBtn) {
