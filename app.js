@@ -57,7 +57,7 @@ onAuthStateChanged(auth, (user) => {
     
     if (user) {
         // If logged in, don't let them stay on the login screen
-        if (currentPath.includes("login.html") || currentPath.endsWith("/")) {
+        if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
         }
         
@@ -72,9 +72,11 @@ onAuthStateChanged(auth, (user) => {
     } else {
         // If logged out, don't let them view the dashboard
         if (currentPath.includes("dashboard.html")) {
-            safeRedirect("LOGIN.html"); // Change to "login.html" if your filename is lowercase on GitHub
+            safeRedirect("index.html");
         }
-        if (loginBtn || createAccBtn) {
+        
+        // Setup login interface if we're on the login/index page
+        if (currentPath.includes("index.html") || currentPath.endsWith("/") || currentPath === "") {
             setupLoginInterfaceListeners();
             setupOtpInputsBehavior(); 
         }
@@ -244,7 +246,7 @@ function setupDashboardInterfaceListeners() {
                     snapshotUnsubscribe = null;
                 }
                 await signOut(auth);
-                safeRedirect("index.html"); // Change to "login.html" if your filename is lowercase on GitHub
+                safeRedirect("index.html");
             } catch (err) {
                 console.error("Logout navigation failure:", err);
                 safeRedirect("index.html");
@@ -461,23 +463,36 @@ function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const agreeCheck = document.getElementById('agreeCheck');
+    const createAccBtnEl = document.getElementById('createAccBtn');
+    const loginBtnEl = document.getElementById('loginBtn');
     
     const termsLink = document.getElementById('termsLink');
     const termsModal = document.getElementById('termsModal');
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
+    // Terms modal handlers
     if (termsLink && termsModal) {
-        termsLink.onclick = (e) => { e.preventDefault(); termsModal.classList.remove('hidden'); };
-        const hideModal = () => { termsModal.classList.add('hidden'); };
-        if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
-        if (acceptTermsBtn) {
-            acceptTermsBtn.onclick = () => { if (agreeCheck) agreeCheck.checked = true; hideModal(); };
-        }
+        termsLink.onclick = (e) => { 
+            e.preventDefault(); 
+            termsModal.classList.remove('hidden'); 
+        };
+    }
+    
+    if (closeTermsBtn && termsModal) {
+        closeTermsBtn.onclick = () => { 
+            termsModal.classList.add('hidden'); 
+        };
+    }
+    
+    if (acceptTermsBtn && termsModal && agreeCheck) {
+        acceptTermsBtn.onclick = () => { 
+            agreeCheck.checked = true; 
+            termsModal.classList.add('hidden'); 
+        };
     }
 
-    const sendOtpViaEmail = (recipientEmail, otpCode, actionButton) => {
-        // --- PUT YOUR UNIQUE EMAILJS SERVICE AND TEMPLATE ID'S HERE ---
+    const sendOtpViaEmail = async (recipientEmail, otpCode, mode) => {
         const SERVICE_ID = "service_u4kqk8s"; 
         const TEMPLATE_ID = "template_enyyyzs";
 
@@ -486,55 +501,87 @@ function setupLoginInterfaceListeners() {
             otp_code: otpCode
         };
 
-        emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
-            .then(() => {
-                alert(`A secure verification code has been dispatched to ${recipientEmail}. Please check your inbox.`);
-                document.getElementById('otpModal').classList.remove('hidden');
+        try {
+            const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
+            console.log("Email sent successfully:", response);
+            alert(`Verification code sent to ${recipientEmail}. Check your email!`);
+            
+            // Show OTP modal
+            const otpModal = document.getElementById('otpModal');
+            if (otpModal) {
+                otpModal.classList.remove('hidden');
                 const firstBox = document.querySelector('.otp-box');
                 if (firstBox) firstBox.focus();
-            })
-            .catch((err) => {
-                alert("Failed to send verification email: " + JSON.stringify(err));
-            })
-            .finally(() => {
-                actionButton.textContent = pendingRegistrationData.mode === 'create' ? "Create Account" : "Login";
-                actionButton.disabled = false;
-            });
+            }
+        } catch (error) {
+            console.error("Email send failed:", error);
+            alert("Failed to send verification email. Please try again.");
+        } finally {
+            // Re-enable buttons
+            if (createAccBtnEl) {
+                createAccBtnEl.textContent = "Create Account";
+                createAccBtnEl.disabled = false;
+            }
+            if (loginBtnEl) {
+                loginBtnEl.textContent = "Login";
+                loginBtnEl.disabled = false;
+            }
+        }
     };
 
-    if (createAccBtn) {
-        const newCreateBtn = createAccBtn.cloneNode(true); createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
-        newCreateBtn.onclick = (e) => {
+    // Create Account handler
+    if (createAccBtnEl) {
+        createAccBtnEl.onclick = (e) => {
             e.preventDefault();
-            if (!agreeCheck || !agreeCheck.checked) return alert("You must read and agree to the Terms & Conditions to create an account.");
-            const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
-            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
-            if (cleanPassword.length < 6) return alert("Password must be at least 6 characters long.");
+            
+            if (!agreeCheck || !agreeCheck.checked) {
+                alert("You must read and agree to the Terms & Conditions to create an account.");
+                return;
+            }
+            
+            const cleanEmail = emailInput.value.trim();
+            const cleanPassword = passwordInput.value.trim();
+            
+            if (!cleanEmail || !cleanPassword) {
+                alert("Please fill in email and password fields.");
+                return;
+            }
+            
+            if (cleanPassword.length < 6) {
+                alert("Password must be at least 6 characters long.");
+                return;
+            }
 
-            newCreateBtn.textContent = "Sending Email Verification...";
-            newCreateBtn.disabled = true;
+            createAccBtnEl.textContent = "Sending Email Verification...";
+            createAccBtnEl.disabled = true;
 
             systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
             pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'create' };
 
-            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, newCreateBtn);
+            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, 'create');
         };
     }
 
-    if (loginBtn) {
-        const newLoginBtn = loginBtn.cloneNode(true); loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
-        newLoginBtn.onclick = (e) => {
+    // Login handler
+    if (loginBtnEl) {
+        loginBtnEl.onclick = (e) => {
             e.preventDefault();
-            const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
-            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
+            
+            const cleanEmail = emailInput.value.trim();
+            const cleanPassword = passwordInput.value.trim();
+            
+            if (!cleanEmail || !cleanPassword) {
+                alert("Please fill in email and password fields.");
+                return;
+            }
 
-            newLoginBtn.textContent = "Sending Login Code...";
-            newLoginBtn.disabled = true;
+            loginBtnEl.textContent = "Sending Login Code...";
+            loginBtnEl.disabled = true;
 
             systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
             pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'login' };
 
-            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, newLoginBtn);
+            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, 'login');
         };
     }
 }
