@@ -433,8 +433,12 @@ function setupModuleSubmissionListeners() {
     if (closeInboxBtn) closeInboxBtn.onclick = () => closeModal('modInboxModal');
 
     // --- Submit Basic Task (My Tasks) ---
-    const modSubmitTaskBtn = document.getElementById('modSubmitTaskBtn');
+    let modSubmitTaskBtn = document.getElementById('modSubmitTaskBtn');
     if (modSubmitTaskBtn) {
+        const cleanSubmitTaskBtn = modSubmitTaskBtn.cloneNode(true);
+        modSubmitTaskBtn.parentNode.replaceChild(cleanSubmitTaskBtn, modSubmitTaskBtn);
+        modSubmitTaskBtn = cleanSubmitTaskBtn;
+
         modSubmitTaskBtn.onclick = async () => {
             if (submitTaskInProgress) return;
             submitTaskInProgress = true;
@@ -464,20 +468,7 @@ function setupModuleSubmissionListeners() {
                         existingTask.category = category;
                     }
                 } else {
-                    const docRef = await addDoc(collection(db, "tasks"), {
-                        userEmail: auth.currentUser.email,
-                        title: title,
-                        category: category,
-                        date: null,
-                        time: null,
-                        reminderDateTime: null,
-                        reminderTriggered: false,
-                        completed: false,
-                        createdAt: new Date()
-                    });
-
-                    cachedTasksArray.push({
-                        id: docRef.id,
+                    await addDoc(collection(db, "tasks"), {
                         userEmail: auth.currentUser.email,
                         title: title,
                         category: category,
@@ -492,7 +483,6 @@ function setupModuleSubmissionListeners() {
 
                 resetTaskModalState();
                 closeModal('modTasksModal');
-                refreshTaskDisplay();
             } catch (err) {
                 alert(err.message);
             } finally {
@@ -564,22 +554,53 @@ async function applyCalendarScheduleIfReady() {
     }
 }
 
+let calendarAutoCloseState = {
+    dateTouched: false,
+    timeTouched: false,
+    taskTouched: false
+};
+
+function resetCalendarAutoCloseState() {
+    calendarAutoCloseState.dateTouched = false;
+    calendarAutoCloseState.timeTouched = false;
+    calendarAutoCloseState.taskTouched = false;
+}
+
 function bindCalendarAutoCloseInputs() {
     const dateInput = document.getElementById('modCalendarDate');
     const timeInput = document.getElementById('modCalendarTime');
     const taskSelect = document.getElementById('modCalendarTaskSelect');
 
-    const maybeAutoClose = async () => {
+    const maybeAutoClose = async (source) => {
         if (!dateInput || !timeInput || !taskSelect) return;
         if (!dateInput.value || !timeInput.value || !taskSelect.value) return;
+
+        if (source === 'date') {
+            calendarAutoCloseState.dateTouched = true;
+            if (!calendarAutoCloseState.timeTouched) return;
+        }
+
+        if (source === 'time') {
+            calendarAutoCloseState.timeTouched = true;
+        }
+
+        if (source === 'task') {
+            calendarAutoCloseState.taskTouched = true;
+            if (!calendarAutoCloseState.timeTouched) return;
+        }
+
         await applyCalendarScheduleIfReady();
     };
 
-    [dateInput, timeInput, taskSelect].forEach(element => {
-        if (element) {
-            element.addEventListener('change', maybeAutoClose);
-        }
-    });
+    if (dateInput) {
+        dateInput.addEventListener('change', () => maybeAutoClose('date'));
+    }
+    if (timeInput) {
+        timeInput.addEventListener('change', () => maybeAutoClose('time'));
+    }
+    if (taskSelect) {
+        taskSelect.addEventListener('change', () => maybeAutoClose('task'));
+    }
 }
 
 // ======================================================
@@ -602,6 +623,7 @@ function bindFeatureCardsToModals() {
             element.classList.add("hover:border-purple-500/50", "transition-colors");
             element.onclick = () => {
                 populateCalendarDropdown();
+                resetCalendarAutoCloseState();
                 const now = new Date();
                 document.getElementById('modCalendarDate').value = now.toISOString().split('T')[0];
                 document.getElementById('modCalendarTime').value = "12:00";
@@ -841,13 +863,15 @@ function setupRealtimeTasks(userEmail) {
     );
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
-        cachedTasksArray = [];
+        const uniqueTasks = new Map();
 
         snapshot.forEach((docSnapshot) => {
             const task = docSnapshot.data();
             const id = docSnapshot.id;
-            cachedTasksArray.push({ id, ...task });
+            uniqueTasks.set(id, { id, ...task });
         });
+
+        cachedTasksArray = Array.from(uniqueTasks.values());
 
         updateTaskStats(cachedTasksArray);
         renderTaskList(cachedTasksArray);
