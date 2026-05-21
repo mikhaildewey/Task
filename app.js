@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ==========================================
-// REPLACE WITH YOUR FIREBASE CONFIGURATION OBJECT
+// FIREBASE CONFIGURATION OBJECT
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyBw-u4Pzc8zqj4r_Drh6kAY8BIMFcr6gJ8",
@@ -26,7 +26,7 @@ const db = getFirestore(app);
 let currentCategoryFilter = "All";
 let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
-let cachedTasksArray = []; // Stores tasks globally to feed newly added interactive utilities
+let cachedTasksArray = []; 
 
 const loginBtn = document.getElementById('loginBtn');
 const createAccBtn = document.getElementById('createAccBtn');
@@ -49,7 +49,7 @@ onAuthStateChanged(auth, (user) => {
             injectDynamicFeatureModals(); 
         }
     } else {
-        // Fallback relative route ensures both local server and github pages resolve safely
+        // FIXED: Added relative paths to reliably find your case-sensitive LOGIN.html file
         if (addTaskBtn || logoutBtn) {
             window.location.replace("./LOGIN.html");
         }
@@ -57,6 +57,7 @@ onAuthStateChanged(auth, (user) => {
             setupLoginInterfaceListeners();
         }
     }
+}); // <-- FIXED: This closing bracket was completely missing in your code!
 
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
@@ -82,14 +83,12 @@ function injectDynamicFeatureModals() {
         <div id="utilityModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-all duration-200">
             <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
                 <div class="p-4 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
-                    <h3 id="utilityModalTitle" class="text-base font-bold text-white flex items-center gap-2">
-                        </h3>
+                    <h3 id="utilityModalTitle" class="text-base font-bold text-white flex items-center gap-2"></h3>
                     <button type="button" id="closeUtilityModalBtn" class="text-gray-400 hover:text-white transition text-lg p-1">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <div id="utilityModalBody" class="p-5 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-4">
-                    </div>
+                <div id="utilityModalBody" class="p-5 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-4"></div>
             </div>
         </div>
     `;
@@ -107,7 +106,7 @@ function triggerFeatureView(featureType) {
     const bodyEl = document.getElementById('utilityModalBody');
     if (!modal || !titleEl || !bodyEl) return;
 
-    bodyEl.innerHTML = ''; // Reset UI Container
+    bodyEl.innerHTML = ''; 
 
     if (featureType === 'Calendar') {
         titleEl.innerHTML = `<i class="fa-solid fa-calendar text-purple-400"></i> Local Schedule Planner`;
@@ -172,7 +171,7 @@ function triggerFeatureView(featureType) {
         `;
     }
 
-    modal.classList.remove('hidden'); // Smooth popup transition toggle open
+    modal.classList.remove('hidden'); 
 }
 
 // --- DASHBOARD UI INTERFACE LISTENERS ---
@@ -185,8 +184,6 @@ function setupDashboardInterfaceListeners() {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // --- MAP AND BIND ALL CLICK ACTIONS ACROSS SIDEBAR AND DASHBOARD GRID BUTTONS ---
-    
     // 1. Home Buttons Configuration
     ['sideNavHome'].forEach(id => {
         const btn = document.getElementById(id);
@@ -231,7 +228,18 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    if (logoutBtn) logoutBtn.onclick = () => signOut(auth);
+    // FIXED: Formatted the logout execution statement with robust fallback paths
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            try {
+                await signOut(auth);
+                window.location.replace("./LOGIN.html");
+            } catch (err) {
+                console.error("Logout navigation block:", err);
+                window.location.assign("./LOGIN.html");
+            }
+        };
+    }
 
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
@@ -295,14 +303,13 @@ function setupRealtimeTasks() {
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
         taskList.innerHTML = '';
-        cachedTasksArray = []; // Refresh operational memory cache array clear
+        cachedTasksArray = []; 
         let total = 0, completedCount = 0, pendingCount = 0;
 
         snapshot.forEach((docSnapshot) => {
             const task = docSnapshot.data();
             const id = docSnapshot.id;
 
-            // Preserve current database logs inside runtime reference
             cachedTasksArray.push({ id, ...task });
 
             total++;
@@ -333,12 +340,10 @@ function setupRealtimeTasks() {
             taskList.appendChild(row);
         });
 
-        // Sync visual count tags on main board cards
         if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
         if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
         if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
         
-        // Synchronize numeric badges displayed adjacent to left side layout shortcuts text
         const badgeTasks = document.getElementById('sideBadgeTasks') || document.querySelector('aside span.bg-\\[\\#252836\\]');
         if (badgeTasks) badgeTasks.textContent = pendingCount;
 
