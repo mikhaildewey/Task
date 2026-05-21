@@ -423,16 +423,28 @@ function attachDynamicItemListeners() {
 // --- OTP FIELD NAVIGATION ROUTINES ---
 function setupOtpInputsBehavior() {
     const boxes = document.querySelectorAll('.otp-box');
+    
     boxes.forEach((box, idx) => {
         box.oninput = (e) => {
+            // Only allow digits
             box.value = box.value.replace(/[^0-9]/g, '');
+            
+            // Auto-focus to next box
             if (box.value.length === 1 && idx < boxes.length - 1) {
                 boxes[idx + 1].focus(); 
             }
         };
+        
         box.onkeydown = (e) => {
+            // Backspace moves to previous box
             if (e.key === "Backspace" && box.value.length === 0 && idx > 0) {
                 boxes[idx - 1].focus(); 
+            }
+            
+            // Allow pasting full OTP
+            if (e.key === "v" || e.key === "V") {
+                e.preventDefault();
+                // User will need to paste in each field or paste first digit
             }
         };
     });
@@ -454,7 +466,8 @@ function setupOtpInputsBehavior() {
             boxes.forEach(b => combinedUserEntry += b.value);
 
             if (combinedUserEntry.length !== 6) {
-                return alert("Please enter the complete 6-digit verification code.");
+                alert("Please enter all 6 digits.");
+                return;
             }
 
             if (combinedUserEntry === String(systemGeneratedOtp)) {
@@ -462,22 +475,30 @@ function setupOtpInputsBehavior() {
                     verifyOtpBtn.textContent = "Verifying...";
                     verifyOtpBtn.disabled = true;
                     
+                    console.log("OTP verified! Mode:", pendingRegistrationData.mode);
+                    
                     if (pendingRegistrationData.mode === 'create') {
+                        console.log("Creating user with email:", pendingRegistrationData.email);
                         await createUserWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
                     } else {
+                        console.log("Signing in user with email:", pendingRegistrationData.email);
                         await signInWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
                     }
                     
                     document.getElementById('otpModal').classList.add('hidden');
                     boxes.forEach(b => b.value = '');
+                    alert("Success! Redirecting...");
                 } catch (error) {
-                    alert("Authentication Failed: " + error.message);
+                    alert("Authentication Failed:\n" + error.message);
+                    console.error("Auth error:", error);
                 } finally {
                     verifyOtpBtn.textContent = "Verify Securely";
                     verifyOtpBtn.disabled = false;
                 }
             } else {
-                alert("Incorrect Security OTP. Please re-check your email.");
+                alert("Incorrect OTP code. Please try again.");
+                boxes.forEach(b => b.value = '');
+                boxes[0].focus();
             }
         };
     }
@@ -502,19 +523,28 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
     };
 
     try {
+        console.log("Sending OTP to:", recipientEmail);
         const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
         console.log("Email sent successfully:", response);
-        alert(`Verification code sent to ${recipientEmail}. Check your email!`);
+        
+        alert(`Verification code sent to ${recipientEmail}.\n\nCheck your email and enter the 6-digit code.`);
         
         const otpModal = document.getElementById('otpModal');
         if (otpModal) {
+            // Clear previous OTP values
+            document.querySelectorAll('.otp-box').forEach(box => box.value = '');
+            
             otpModal.classList.remove('hidden');
             const firstBox = document.querySelector('.otp-box');
             if (firstBox) firstBox.focus();
         }
     } catch (error) {
         console.error("Email send failed:", error);
-        alert("Failed to send verification email. Please try again.");
+        alert("Failed to send verification email.\n\nError: " + error.message + "\n\nPlease try again.");
+        
+        // Clear global state on error
+        systemGeneratedOtp = null;
+        pendingRegistrationData = null;
     }
 }
 
@@ -540,7 +570,14 @@ async function handleAuth(mode) {
         return;
     }
 
-    // 2️⃣ Password complexity validation
+    // 2️⃣ Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        alert("Please enter a valid email address.");
+        return;
+    }
+
+    // 3️⃣ Password complexity validation
     const { hasLength, hasUppercase, hasSpecial } = validatePassword(pass);
     if (!hasLength || !hasUppercase || !hasSpecial) {
         alert(
@@ -549,24 +586,36 @@ async function handleAuth(mode) {
         return;
     }
 
-    // 3️⃣ Terms validation
+    // 4️⃣ Terms validation for account creation
     if (mode === "create" && agreeCheck && !agreeCheck.checked) {
-        alert("You must agree to the terms to proceed.");
+        alert("You must agree to the Terms & Conditions to create an account.");
         return;
     }
 
-    // 4️⃣ Set processing state
+    // 5️⃣ Set processing state
     const btn = mode === "create" ? createAccBtnEl : loginBtnEl;
+    const originalText = btn.textContent;
+    const originalDisabled = btn.disabled;
+    
     if (btn) {
-        btn.textContent = "Processing...";
+        btn.textContent = mode === "create" ? "Creating Account..." : "Sending Login Code...";
         btn.disabled = true;
     }
 
-    // 5️⃣ Trigger OTP
+    // 6️⃣ Trigger OTP
     systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
     pendingRegistrationData = { email, password: pass, mode };
 
-    await sendOtpViaEmail(email, systemGeneratedOtp, mode);
+    try {
+        await sendOtpViaEmail(email, systemGeneratedOtp, mode);
+    } catch (error) {
+        console.error("Auth error:", error);
+        // Restore button state on error
+        if (btn) {
+            btn.textContent = originalText;
+            btn.disabled = originalDisabled;
+        }
+    }
 }
 
 // --- LOGIN INTERFACE EVENT BINDINGS ---

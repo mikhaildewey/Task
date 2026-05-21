@@ -12,6 +12,7 @@
     <title>Smart Task Scheduler - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="module" src="app.js"></script>
 </head>
 <body class="bg-[#0F1015] h-screen flex items-center justify-center p-4 text-white font-sans relative overflow-hidden">
 
@@ -93,77 +94,83 @@
     </div>
 
     <script>
-        // Password logic implementation
-        const passwordInput = document.getElementById('password');
-        const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-        const eyeIcon = document.getElementById('eyeIcon');
-        const strengthBar = document.getElementById('strengthBar');
-        const strengthText = document.getElementById('strengthText');
-        
-        const rules = {
-            length: document.getElementById('ruleLength'),
-            upper: document.getElementById('ruleUppercase'),
-            special: document.getElementById('ruleSpecial')
-        };
+        // Local password strength visualization (runs before app.js)
+        document.addEventListener('DOMContentLoaded', () => {
+            const passwordInput = document.getElementById('password');
+            const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+            const eyeIcon = document.getElementById('eyeIcon');
+            const strengthBar = document.getElementById('strengthBar');
+            const strengthText = document.getElementById('strengthText');
+            
+            const rules = {
+                length: document.getElementById('ruleLength'),
+                upper: document.getElementById('ruleUppercase'),
+                special: document.getElementById('ruleSpecial')
+            };
 
-        togglePasswordBtn.addEventListener('click', () => {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            eyeIcon.classList.toggle('fa-eye');
-            eyeIcon.classList.toggle('fa-eye-slash');
-        });
-
-        passwordInput.addEventListener('input', () => {
-    const val = passwordInput.value;
-    
-    // 1. Define criteria
-    const hasLength = val.length >= 6;
-    const hasUpper = /[A-Z]/.test(val);
-    const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
-
-    // 2. Update UI for each rule independently
-    updateRule(rules.length, hasLength);
-    updateRule(rules.upper, hasUpper);
-    updateRule(rules.special, hasSpecial);
-
-    // 3. Calculate Strength Score (0 to 3)
-    let score = 0;
-    if (hasLength) score++;
-    if (hasUpper) score++;
-    if (hasSpecial) score++;
-
-    // 4. Update UI based on score
-    if (val.length === 0) {
-        strengthBar.style.width = "0%";
-        strengthText.textContent = "Strength: Empty";
-        strengthBar.style.backgroundColor = "#ef4444";
-    } else if (score === 3) {
-        strengthBar.style.width = "100%";
-        strengthBar.style.backgroundColor = "#10b981"; // Green (Strong)
-        strengthText.textContent = "Strength: Strong";
-    } else if (score === 2) {
-        strengthBar.style.width = "66%";
-        strengthBar.style.backgroundColor = "#f59e0b"; // Yellow (Medium)
-        strengthText.textContent = "Strength: Medium";
-    } else {
-        strengthBar.style.width = "33%";
-        strengthBar.style.backgroundColor = "#ef4444"; // Red (Weak)
-        strengthText.textContent = "Strength: Weak";
-    }
-});
-
-        function updateRule(element, isValid) {
-            const icon = element.querySelector('i');
-            if (isValid) {
-                element.classList.add('text-emerald-400');
-                element.classList.remove('text-gray-400');
-                icon.className = 'fa-solid fa-circle-check text-[10px]';
-            } else {
-                element.classList.remove('text-emerald-400');
-                element.classList.add('text-gray-400');
-                icon.className = 'fa-solid fa-circle text-[6px]';
+            // Toggle password visibility
+            if (togglePasswordBtn) {
+                togglePasswordBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    eyeIcon.classList.toggle('fa-eye');
+                    eyeIcon.classList.toggle('fa-eye-slash');
+                });
             }
-        }
+
+            // Real-time password strength
+            if (passwordInput) {
+                passwordInput.addEventListener('input', () => {
+                    const val = passwordInput.value;
+                    
+                    const hasLength = val.length >= 6;
+                    const hasUpper = /[A-Z]/.test(val);
+                    const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
+
+                    updateRule(rules.length, hasLength);
+                    updateRule(rules.upper, hasUpper);
+                    updateRule(rules.special, hasSpecial);
+
+                    let score = 0;
+                    if (hasLength) score++;
+                    if (hasUpper) score++;
+                    if (hasSpecial) score++;
+
+                    if (val.length === 0) {
+                        strengthBar.style.width = "0%";
+                        strengthBar.style.backgroundColor = "#ef4444";
+                        strengthText.textContent = "Strength: Empty";
+                    } else if (score === 3) {
+                        strengthBar.style.width = "100%";
+                        strengthBar.style.backgroundColor = "#10b981";
+                        strengthText.textContent = "Strength: Strong ✓";
+                    } else if (score === 2) {
+                        strengthBar.style.width = "66%";
+                        strengthBar.style.backgroundColor = "#f59e0b";
+                        strengthText.textContent = "Strength: Medium";
+                    } else {
+                        strengthBar.style.width = "33%";
+                        strengthBar.style.backgroundColor = "#ef4444";
+                        strengthText.textContent = "Strength: Weak";
+                    }
+                });
+            }
+
+            function updateRule(element, isValid) {
+                if (!element) return;
+                const icon = element.querySelector('i');
+                if (isValid) {
+                    element.classList.add('text-emerald-400');
+                    element.classList.remove('text-gray-400');
+                    icon.className = 'fa-solid fa-circle-check text-[10px]';
+                } else {
+                    element.classList.remove('text-emerald-400');
+                    element.classList.add('text-gray-400');
+                    icon.className = 'fa-solid fa-circle text-[6px]';
+                }
+            }
+        });
     </script>
 
     <!-- OTP Verification Modal -->
