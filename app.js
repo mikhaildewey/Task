@@ -550,7 +550,7 @@ function setupLoginInterfaceListeners() {
             }
 
             // Special character restriction check rendering update
-            if (hasNoSpecial || val === "") {
+            if (hasSpecial || val === "") {
                 ruleSpecial.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
                 ruleSpecial.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
             } else {
@@ -563,14 +563,14 @@ function setupLoginInterfaceListeners() {
             if (val.length > 0) score += 1;
             if (hasLength) score += 1;
             if (hasUppercase) score += 1;
-            if (hasNoSpecial && val.length > 0) score += 1;
+            if (hasSpecial && val.length > 0) score += 1;
 
             // Color status interface renderer pipeline
             if (val.length === 0) {
                 strengthBar.style.width = "0%";
                 strengthText.textContent = "Strength: Empty";
                 strengthText.className = "text-[10px] text-gray-500 mt-1 font-medium";
-            } else if (!hasNoSpecial) {
+            } else if (score <= 1) {
                 // Instantly turn red if illegal special characters are typed
                 strengthBar.style.width = "25%";
                 strengthBar.className = "h-full bg-red-500 transition-all duration-300";
