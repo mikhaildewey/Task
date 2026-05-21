@@ -55,7 +55,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Locate this inside your app.js file to ensure it aligns perfectly:
+// --- UPDATED LOGIN & REGISTER HANDLERS WITH INPUT TRIMMING ---
 function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -66,10 +66,11 @@ function setupLoginInterfaceListeners() {
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
+    // Terms Modal Display Toggles
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => {
             e.preventDefault();
-            termsModal.classList.remove('hidden'); // Opens instantly on mobile phones
+            termsModal.classList.remove('hidden');
         };
 
         const hideModal = () => {
@@ -77,16 +78,13 @@ function setupLoginInterfaceListeners() {
         };
 
         if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
-        
         if (acceptTermsBtn) {
             acceptTermsBtn.onclick = () => {
-                if (agreeCheck) agreeCheck.checked = true; // Auto-checks your HTML form wrapper box!
+                if (agreeCheck) agreeCheck.checked = true;
                 hideModal();
             };
         }
     }
-    // ... rest of your authentication code block follows
-}
 
     // Account Creation Event Handler
     if (createAccBtn) {
@@ -98,11 +96,16 @@ function setupLoginInterfaceListeners() {
             if (!agreeCheck || !agreeCheck.checked) {
                 return alert("You must read and agree to the Terms & Conditions to create an account.");
             }
-            if (!emailInput.value || !passwordInput.value) return alert("Please fill in email and password fields.");
+            
+            // Clean inputs to avoid accidental errors
+            const cleanEmail = emailInput.value.trim();
+            const cleanPassword = passwordInput.value.trim();
+
+            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
             
             try {
                 newCreateBtn.textContent = "Creating Account...";
-                await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
             } catch (error) {
                 alert("Registration Failed: " + error.message);
                 newCreateBtn.textContent = "Create Account";
@@ -117,19 +120,28 @@ function setupLoginInterfaceListeners() {
         
         newLoginBtn.onclick = async (e) => {
             e.preventDefault();
-            if (!emailInput.value || !passwordInput.value) return alert("Please fill in email and password fields.");
+            
+            // Clean inputs automatically to prevent rate-limiting typos
+            const cleanEmail = emailInput.value.trim();
+            const cleanPassword = passwordInput.value.trim();
+
+            if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
             
             try {
                 newLoginBtn.textContent = "Logging in...";
-                await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+                await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
             } catch (error) {
-                alert("Login Failed: " + error.message);
+                // Friendly translation for rate limit notifications
+                if (error.code === 'auth/too-many-requests') {
+                    alert("This device is temporarily locked due to multiple login failures. Please change networks or try again in a few minutes.");
+                } else {
+                    alert("Login Failed: " + error.message);
+                }
                 newLoginBtn.textContent = "Login";
             }
         };
     }
 }
-
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
     const timeEl = document.getElementById('liveTime');
