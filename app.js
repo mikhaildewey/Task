@@ -283,8 +283,18 @@ function closeModal(modalId) {
 // ======================================================
 // INJECT MODULAR COMPONENT INTERFACES
 // ======================================================
+let activeTaskFilter = 'All';
+
 function injectModularSystemInterfaces() {
-    if (document.getElementById('modularSystemContainer')) return;
+    if (document.getElementById('modularSystemContainer')) {
+        setupModuleSubmissionListeners();
+        return;
+    }
+
+    if (document.getElementById('modTasksModal')) {
+        setupModuleSubmissionListeners();
+        return;
+    }
 
     const container = document.createElement('div');
     container.id = 'modularSystemContainer';
@@ -402,13 +412,22 @@ function openTaskModalForEdit(task) {
 function setupModuleSubmissionListeners() {
     
     // --- Cancel / Close Buttons Bindings ---
-    document.getElementById('closeTasksModalBtn').onclick = () => closeModal('modTasksModal');
-    document.getElementById('closeCalendarModalBtn').onclick = () => closeModal('modCalendarModal');
-    document.getElementById('closeRemindersModalBtn').onclick = () => closeModal('modRemindersModal');
-    document.getElementById('closeInboxModalBtn').onclick = () => closeModal('modInboxModal');
+    const closeTasksModalBtn = document.getElementById('closeTasksModalBtn');
+    if (closeTasksModalBtn) closeTasksModalBtn.onclick = () => closeModal('modTasksModal');
+
+    const closeCalendarModalBtn = document.getElementById('closeCalendarModalBtn');
+    if (closeCalendarModalBtn) closeCalendarModalBtn.onclick = () => closeModal('modCalendarModal');
+
+    const closeRemindersModalBtn = document.getElementById('closeRemindersModalBtn');
+    if (closeRemindersModalBtn) closeRemindersModalBtn.onclick = () => closeModal('modRemindersModal');
+
+    const closeInboxModalBtn = document.getElementById('closeInboxModalBtn');
+    if (closeInboxModalBtn) closeInboxModalBtn.onclick = () => closeModal('modInboxModal');
 
     // --- Submit Basic Task (My Tasks) ---
-    document.getElementById('modSubmitTaskBtn').onclick = async () => {
+    const modSubmitTaskBtn = document.getElementById('modSubmitTaskBtn');
+    if (modSubmitTaskBtn) {
+        modSubmitTaskBtn.onclick = async () => {
         const taskId = document.getElementById('modTaskId').value;
         const title = document.getElementById('modTaskTitle').value.trim();
         const category = document.getElementById('modTaskCategory').value;
@@ -440,6 +459,7 @@ function setupModuleSubmissionListeners() {
 
             resetTaskModalState();
             closeModal('modTasksModal');
+            renderTaskList(cachedTasksArray);
         } catch (err) {
             alert(err.message);
         }
@@ -595,6 +615,77 @@ function populateInboxLogsPanel() {
 
 // ======================================================
 // DASHBOARD GENERAL ACTIONS LISTENERS
+function setActiveTaskFilter(filter) {
+    activeTaskFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.id === `filter${filter}` || (filter === 'All' && btn.id === 'filterAll')) {
+            btn.classList.remove('text-gray-400', 'bg-[#0F1015]');
+            btn.classList.add('text-white', 'bg-[#252836]');
+        } else {
+            btn.classList.remove('text-white', 'bg-[#252836]');
+            btn.classList.add('text-gray-400');
+        }
+    });
+    renderTaskList(cachedTasksArray);
+}
+
+function taskMatchesFilter(task) {
+    return activeTaskFilter === 'All' || task.category === activeTaskFilter;
+}
+
+function updateTaskStats(tasks) {
+    const total = tasks.length;
+    const completed = tasks.filter(task => task.completed).length;
+    const pending = total - completed;
+
+    const totalEl = document.getElementById('totalTasksCount');
+    const completedEl = document.getElementById('completedTasksCount');
+    const pendingEl = document.getElementById('pendingTasksCount');
+    const badgeEl = document.getElementById('sideBadgeTasks');
+
+    if (totalEl) totalEl.textContent = total;
+    if (completedEl) completedEl.textContent = completed;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (badgeEl) badgeEl.textContent = total;
+}
+
+function renderTaskList(tasks) {
+    const taskList = document.getElementById('taskList');
+    if (!taskList) return;
+
+    taskList.innerHTML = '';
+    const filteredTasks = tasks.filter(taskMatchesFilter);
+
+    filteredTasks.forEach(task => {
+        const row = document.createElement('div');
+        row.className = "bg-[#1E2030] p-4 rounded-xl mb-2 flex justify-between items-center border border-[#2A2D3E]/40 hover:border-purple-500/30 transition-all group";
+        row.innerHTML = `
+            <div class="flex items-center gap-3">
+                <input type="checkbox" data-id="${task.id}" ${task.completed ? "checked" : ""} class="task-toggle-checkbox accent-purple-500 h-4 w-4 rounded cursor-pointer transition-transform hover:scale-110">
+                <div>
+                    <p class="${task.completed ? 'line-through text-gray-500' : 'text-white font-medium transition-colors group-hover:text-purple-100'}">
+                        ${task.title}
+                    </p>
+                    <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                        <span class="text-purple-400 font-medium">${task.category}</span>
+                        •
+                        <span class="${task.date ? 'text-gray-300' : 'text-gray-500 italic'}">
+                            <i class="fa-regular fa-calendar-check text-[10px]"></i> ${task.date ? `${task.date} at ${task.time}` : "Unscheduled Plan"}
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button data-id="${task.id}" class="edit-task-btn text-xs font-semibold bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Edit</button>
+                <button data-id="${task.id}" class="delete-task-btn text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Remove</button>
+            </div>
+        `;
+        taskList.appendChild(row);
+    });
+
+    attachDynamicItemListeners();
+}
+
 // ======================================================
 function setupDashboardInterfaceListeners() {
     const addTaskBtn = document.getElementById('addTaskBtn');
@@ -622,6 +713,19 @@ function setupDashboardInterfaceListeners() {
             openModal('modTasksModal');
         };
     }
+
+    const filterButtons = [
+        { id: 'filterAll', name: 'All' },
+        { id: 'filterWork', name: 'Work' },
+        { id: 'filterPersonal', name: 'Personal' },
+        { id: 'filterSchool', name: 'School' }
+    ];
+
+    filterButtons.forEach(filter => {
+        const btn = document.getElementById(filter.id);
+        if (!btn) return;
+        btn.onclick = () => setActiveTaskFilter(filter.name);
+    });
 }
 
 // ======================================================
@@ -639,46 +743,17 @@ function setupRealtimeTasks(userEmail) {
     );
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
-        taskList.innerHTML = '';
         cachedTasksArray = [];
 
         snapshot.forEach((docSnapshot) => {
             const task = docSnapshot.data();
             const id = docSnapshot.id;
-
-            const fullTask = { id, ...task };
-            cachedTasksArray.push(fullTask);
-
-            const row = document.createElement('div');
-            row.className = "bg-[#1E2030] p-4 rounded-xl mb-2 flex justify-between items-center border border-[#2A2D3E]/40 hover:border-purple-500/30 transition-all group";
-            
-            row.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <input type="checkbox" data-id="${id}" 
-                        ${task.completed ? "checked" : ""} 
-                        class="task-toggle-checkbox accent-purple-500 h-4 w-4 rounded cursor-pointer transition-transform hover:scale-110">
-                    <div>
-                        <p class="${task.completed ? 'line-through text-gray-500' : 'text-white font-medium transition-colors group-hover:text-purple-100'}">
-                            ${task.title}
-                        </p>
-                        <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
-                            <span class="text-purple-400 font-medium">${task.category}</span> 
-                            • 
-                            <span class="${task.date ? 'text-gray-300' : 'text-gray-500 italic'}">
-                                <i class="fa-regular fa-calendar-check text-[10px]"></i> ${task.date ? `${task.date} at ${task.time}` : "Unscheduled Plan"}
-                            </span>
-                        </p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button data-id="${id}" class="edit-task-btn text-xs font-semibold bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Edit</button>
-                    <button data-id="${id}" class="delete-task-btn text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Remove</button>
-                </div>
-            `;
-            taskList.appendChild(row);
+            cachedTasksArray.push({ id, ...task });
         });
 
-        // Sync contents live if modals are open
+        updateTaskStats(cachedTasksArray);
+        renderTaskList(cachedTasksArray);
+
         const calendarModal = document.getElementById('modCalendarModal');
         const remindersModal = document.getElementById('modRemindersModal');
         const inboxModal = document.getElementById('modInboxModal');
@@ -686,8 +761,6 @@ function setupRealtimeTasks(userEmail) {
         if (calendarModal && calendarModal.classList.contains('opacity-100')) populateCalendarDropdown();
         if (remindersModal && remindersModal.classList.contains('opacity-100')) populateActiveRemindersPanel();
         if (inboxModal && inboxModal.classList.contains('opacity-100')) populateInboxLogsPanel();
-
-        attachDynamicItemListeners();
     });
 }
 
