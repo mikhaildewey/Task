@@ -18,7 +18,9 @@
     <div class="bg-[#151722] border border-[#2A2D3E] p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl z-10 transition-all">
         <div class="text-center mb-6">
             <div class="flex justify-center mb-4">
-                <img src="logo.png" alt="SmartTask Logo" class="h-20 w-20 rounded-lg shadow-lg">
+                <div class="h-20 w-20 bg-gradient-to-br from-[#7B51D3] to-[#5531A6] rounded-lg shadow-lg flex items-center justify-center">
+                    <i class="fa-solid fa-clipboard-check text-4xl text-white"></i>
+                </div>
             </div>
             <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight mb-1">Smart Task Scheduler</h1>
             <p class="text-xs text-gray-400">Organize your tasks smarter.</p>
@@ -42,25 +44,32 @@
                         <i class="fa-solid fa-lock text-sm"></i>
                     </span>
                     <input type="password" id="password" placeholder="••••••••" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-10 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
-                    <button type="button" id="togglePasswordBtn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-white transition focus:outline-none">
-                        <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                    <button type="button" id="togglePasswordBtn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-[#7B51D3] transition focus:outline-none cursor-pointer" tabindex="-1">
+                        <i class="fa-solid fa-eye" id="eyeIcon" style="font-size: 14px;"></i>
                     </button>
                 </div>
 
-                <div class="w-full bg-[#0F1015] h-1.5 rounded-full mt-2 overflow-hidden border border-[#2A2D3E]">
-                    <div id="strengthBar" class="h-full w-0 transition-all duration-300 bg-red-500"></div>
+                <!-- Password Strength Indicator -->
+                <div class="mt-3 space-y-2">
+                    <div class="w-full bg-[#0F1015] h-2 rounded-full overflow-hidden border border-[#2A2D3E]">
+                        <div id="strengthBar" class="h-full w-0 transition-all duration-300 bg-red-500"></div>
+                    </div>
+                    <div id="strengthText" class="text-xs font-bold text-gray-400">Strength: Empty</div>
                 </div>
-                <div id="strengthText" class="text-[10px] text-gray-500 mt-1 font-medium">Strength: Empty</div>
 
-                <div class="mt-3 p-3 bg-[#0F1015] border border-[#2A2D3E] rounded-xl space-y-1">
-                    <div id="ruleLength" class="text-[11px] text-gray-400 flex items-center gap-1.5 transition">
+                <!-- Password Requirements Checklist -->
+                <div class="mt-3 p-4 bg-gradient-to-br from-[#0F1015] to-[#1A1C28] border border-[#2A2D3E] rounded-xl space-y-2">
+                    <div class="text-xs font-bold text-gray-400 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-shield text-[#7B51D3]"></i> Password Requirements
+                    </div>
+                    <div id="ruleLength" class="text-xs text-gray-400 flex items-center gap-2 transition">
                         <i class="fa-solid fa-circle text-[6px]"></i> At least 6 characters
                     </div>
-                    <div id="ruleUppercase" class="text-[11px] text-gray-400 flex items-center gap-1.5 transition">
-                        <i class="fa-solid fa-circle text-[6px]"></i> Must contain an Uppercase letter
+                    <div id="ruleUppercase" class="text-xs text-gray-400 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-circle text-[6px]"></i> One uppercase letter (A-Z)
                     </div>
-                    <div id="ruleSpecial" class="text-[11px] text-gray-400 flex items-center gap-1.5 transition">
-                        <i class="fa-solid fa-circle text-[6px]"></i> Must contain a Special character 
+                    <div id="ruleSpecial" class="text-xs text-gray-400 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-circle text-[6px]"></i> One special character (!@#$%^&*)
                     </div>
                 </div>
             </div>
@@ -156,5 +165,68 @@
             }
         }
     </script>
+
+    <!-- OTP Verification Modal -->
+    <div id="otpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-shield-halved text-4xl text-[#7B51D3] mb-3"></i>
+                <h2 class="text-2xl font-bold text-white mb-1">Verify Your Identity</h2>
+                <p class="text-sm text-gray-400">Enter the 6-digit code sent to your email</p>
+            </div>
+
+            <div class="flex justify-center gap-2 mb-6">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+            </div>
+
+            <div class="space-y-3">
+                <button type="button" id="verifyOtpBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">
+                    Verify Securely
+                </button>
+                <button type="button" id="cancelOtpBtn" class="w-full bg-[#252836] hover:bg-[#2A2D3E] text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition">
+                    Cancel
+                </button>
+            </div>
+
+            <p class="text-xs text-gray-500 text-center mt-4">Didn't receive the code? Check your spam folder.</p>
+        </div>
+    </div>
+
+    <!-- Terms & Conditions Modal -->
+    <div id="termsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 sticky top-0 bg-[#151722] pb-4">
+                <h2 class="text-xl font-bold text-white">Terms & Conditions</h2>
+                <button type="button" id="closeTermsBtn" class="text-gray-400 hover:text-white transition text-2xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="text-sm text-gray-300 space-y-4">
+                <div>
+                    <h3 class="text-[#7B51D3] font-bold mb-2">1. Acceptance of Terms</h3>
+                    <p>By using Smart Task Scheduler, you agree to these terms and conditions.</p>
+                </div>
+                <div>
+                    <h3 class="text-[#7B51D3] font-bold mb-2">2. User Accounts</h3>
+                    <p>You are responsible for maintaining confidentiality of your account and password.</p>
+                </div>
+                <div>
+                    <h3 class="text-[#7B51D3] font-bold mb-2">3. Limitations</h3>
+                    <p>We are not liable for any indirect damages arising from your use of this service.</p>
+                </div>
+            </div>
+
+            <button type="button" id="acceptTermsBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md mt-6">
+                I Accept
+            </button>
+        </div>
+    </div>
+
 </body>
 </html>

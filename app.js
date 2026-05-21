@@ -585,6 +585,12 @@ function setupLoginInterfaceListeners() {
     const ruleLength = document.getElementById('ruleLength');
     const ruleUppercase = document.getElementById('ruleUppercase');
     const ruleSpecial = document.getElementById('ruleSpecial');
+    
+    // Terms modal elements
+    const termsLink = document.getElementById('termsLink');
+    const termsModal = document.getElementById('termsModal');
+    const closeTermsBtn = document.getElementById('closeTermsBtn');
+    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
     if (togglePasswordBtn) {
         togglePasswordBtn.onclick = () => {
@@ -596,8 +602,16 @@ function setupLoginInterfaceListeners() {
 
     const updateRuleStyle = (el, condition) => {
         if (!el) return;
-        el.className = `text-[11px] flex items-center gap-1.5 ${condition ? 'text-emerald-400' : 'text-red-400'}`;
-        el.querySelector('i').className = `fa-solid ${condition ? 'fa-circle-check' : 'fa-circle-xmark'} text-[10px]`;
+        const icon = el.querySelector('i');
+        if (condition) {
+            el.classList.add('text-emerald-400');
+            el.classList.remove('text-gray-400');
+            icon.className = 'fa-solid fa-circle-check text-[10px]';
+        } else {
+            el.classList.remove('text-emerald-400');
+            el.classList.add('text-gray-400');
+            icon.className = 'fa-solid fa-circle text-[6px]';
+        }
     };
 
     if (passwordInput) {
@@ -614,17 +628,43 @@ function setupLoginInterfaceListeners() {
             if (strengthBar && strengthText) {
                 if (val.length === 0) {
                     strengthBar.style.width = "0%";
+                    strengthBar.style.backgroundColor = "#ef4444";
                     strengthText.textContent = "Strength: Empty";
                 } else if (score === 3) {
                     strengthBar.style.width = "100%";
-                    strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
-                    strengthText.textContent = "Strength: Strong";
+                    strengthBar.style.backgroundColor = "#10b981";
+                    strengthText.textContent = "Strength: Strong ✓";
+                } else if (score === 2) {
+                    strengthBar.style.width = "66%";
+                    strengthBar.style.backgroundColor = "#f59e0b";
+                    strengthText.textContent = "Strength: Medium";
                 } else {
                     strengthBar.style.width = "33%";
-                    strengthBar.className = "h-full bg-red-500 transition-all duration-300";
+                    strengthBar.style.backgroundColor = "#ef4444";
                     strengthText.textContent = "Strength: Weak";
                 }
             }
+        };
+    }
+
+    // Terms modal handlers
+    if (termsLink && termsModal) {
+        termsLink.onclick = (e) => { 
+            e.preventDefault(); 
+            termsModal.classList.remove('hidden'); 
+        };
+    }
+    
+    if (closeTermsBtn && termsModal) {
+        closeTermsBtn.onclick = () => { 
+            termsModal.classList.add('hidden'); 
+        };
+    }
+    
+    if (acceptTermsBtn && termsModal && agreeCheck) {
+        acceptTermsBtn.onclick = () => { 
+            agreeCheck.checked = true; 
+            termsModal.classList.add('hidden'); 
         };
     }
 
