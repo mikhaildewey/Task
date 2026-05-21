@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-    onAuthStateChanged, signOut 
+    onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
     getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc 
@@ -56,25 +56,19 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
+            return; // Stop execution here while the browser navigates!
         }
         
         if (addTaskBtn) {
-            const emailDisplay = document.getElementById('userEmail') || document.querySelector('.text-sm.text-gray-400');
-            if (emailDisplay) emailDisplay.textContent = user.email;
-            initClockUtilities();
-            setupRealtimeTasks(user.email); 
-            setupDashboardInterfaceListeners();
-            injectDynamicFeatureModals(); 
+            // ... the rest of your dashboard setup
         }
     } else {
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
+            return; // Stop execution here!
         }
         
-        if (currentPath.includes("index.html") || currentPath.endsWith("/") || currentPath === "") {
-           setupLoginInterfaceListeners();
-            setupOtpInputsBehavior(); 
-        }
+        // ... the rest of your login setup
     }
 });
 
