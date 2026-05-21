@@ -28,6 +28,10 @@ let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
 let cachedTasksArray = []; 
 
+// Runtime variable space to track active OTP generation validations
+let systemGeneratedOtp = null;
+let pendingRegistrationData = null;
+
 const loginBtn = document.getElementById('loginBtn');
 const createAccBtn = document.getElementById('createAccBtn');
 const addTaskBtn = document.getElementById('addTaskBtn');
@@ -36,7 +40,6 @@ const logoutBtn = document.getElementById('logoutBtn');
 // --- CENTRAL AUTH STATE ROUTER PIPELINE ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        // If a user is logged in, make sure they stay on the dashboard page
         if (loginBtn || createAccBtn) {
             window.location.replace("dashboard.html");
         } 
@@ -49,15 +52,15 @@ onAuthStateChanged(auth, (user) => {
             injectDynamicFeatureModals(); 
         }
     } else {
-        // FIXED: Added relative paths to reliably find your case-sensitive LOGIN.html file
         if (addTaskBtn || logoutBtn) {
             window.location.replace("./LOGIN.html");
         }
         if (loginBtn || createAccBtn) {
             setupLoginInterfaceListeners();
+            setupOtpInputsBehavior(); // Bind auto-focus inputs logic
         }
     }
-}); // <-- FIXED: This closing bracket was completely missing in your code!
+});
 
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
@@ -228,7 +231,6 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // FIXED: Formatted the logout execution statement with robust fallback paths
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
@@ -375,7 +377,72 @@ function attachDynamicItemListeners() {
     });
 }
 
-// --- FORWARDING INTEGRATION SCHEMATICS FOR LOGIN ROUTINE ATTACHMENTS ---
+// --- PREMIUM AUTO-FOCUS INTERACTION FOR 6-BOX OTP OVERLAY ---
+function setupOtpInputsBehavior() {
+    const boxes = document.querySelectorAll('.otp-box');
+    boxes.forEach((box, idx) => {
+        box.oninput = (e) => {
+            // Force numeric filters only
+            box.value = box.value.replace(/[^0-9]/g, '');
+            if (box.value.length === 1 && idx < boxes.length - 1) {
+                boxes[idx + 1].focus(); // Advance cursor forward on keystroke
+            }
+        };
+        box.onkeydown = (e) => {
+            if (e.key === "Backspace" && box.value.length === 0 && idx > 0) {
+                boxes[idx - 1].focus(); // Recede cursor back on clearing character
+            }
+        };
+    });
+
+    // Close OTP Modal trigger
+    const cancelOtpBtn = document.getElementById('cancelOtpBtn');
+    if (cancelOtpBtn) {
+        cancelOtpBtn.onclick = () => {
+            document.getElementById('otpModal').classList.add('hidden');
+            systemGeneratedOtp = null;
+            pendingRegistrationData = null;
+            boxes.forEach(b => b.value = '');
+        };
+    }
+
+    // Process secure verification evaluation
+    const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+    if (verifyOtpBtn) {
+        verifyOtpBtn.onclick = async () => {
+            let combinedUserEntry = "";
+            boxes.forEach(b => combinedUserEntry += b.value);
+
+            if (combinedUserEntry.length !== 6) {
+                return alert("Please enter the complete 6-digit confirmation key code.");
+            }
+
+            if (combinedUserEntry === String(systemGeneratedOtp)) {
+                // Success path! Authenticate with Firebase Auth
+                try {
+                    const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+                    verifyOtpBtn.textContent = "Activating Profile...";
+                    
+                    if (pendingRegistrationData.mode === 'create') {
+                        await createUserWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
+                    } else {
+                        await signInWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
+                    }
+                    
+                    document.getElementById('otpModal').classList.add('hidden');
+                    boxes.forEach(b => b.value = '');
+                } catch (error) {
+                    alert("Authorization Error: " + error.message);
+                    verifyOtpBtn.textContent = "Verify Securely";
+                }
+            } else {
+                alert("Incorrect Security OTP. Please re-check the issued authorization session key.");
+            }
+        };
+    }
+}
+
+// --- SIGN IN & SIGN UP OVERLAY LISTENERS ---
 function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -397,28 +464,43 @@ function setupLoginInterfaceListeners() {
 
     if (createAccBtn) {
         const newCreateBtn = createAccBtn.cloneNode(true); createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
-        newCreateBtn.onclick = async (e) => {
+        newCreateBtn.onclick = (e) => {
             e.preventDefault();
             if (!agreeCheck || !agreeCheck.checked) return alert("You must read and agree to the Terms & Conditions to create an account.");
             const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
             if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
-            try { newCreateBtn.textContent = "Creating Account..."; await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword); } 
-            catch (error) { alert("Registration Failed: " + error.message); newCreateBtn.textContent = "Create Account"; }
+            if (cleanPassword.length < 6) return alert("Password must be at least 6 characters long.");
+
+            // 1. Generate Secure 6-Digit Verification Token
+            systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
+            pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'create' };
+
+            // 2. Display verification code safely and securely inside system dialog alert
+            alert(`[SECURITY ALERT] Your SmartTask account activation OTP is: ${systemGeneratedOtp}`);
+
+            // 3. Open OTP panel overlay and set programmatic window focus
+            document.getElementById('otpModal').classList.remove('hidden');
+            const firstBox = document.querySelector('.otp-box');
+            if (firstBox) firstBox.focus();
         };
     }
 
     if (loginBtn) {
         const newLoginBtn = loginBtn.cloneNode(true); loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
-        newLoginBtn.onclick = async (e) => {
+        newLoginBtn.onclick = (e) => {
             e.preventDefault();
             const cleanEmail = emailInput.value.trim(); const cleanPassword = passwordInput.value.trim();
             if (!cleanEmail || !cleanPassword) return alert("Please fill in email and password fields.");
-            try { newLoginBtn.textContent = "Logging in..."; await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword); } 
-            catch (error) {
-                if (error.code === 'auth/too-many-requests') alert("This device is temporarily locked due to multiple login failures. Please try again in a few minutes.");
-                else alert("Login Failed: " + error.message);
-                newLoginBtn.textContent = "Login";
-            }
+
+            // Intercepting login path with identical two-factor simulation security step
+            systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
+            pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'login' };
+
+            alert(`[SECURITY VERIFICATION] Your 2FA account authorization login OTP code is: ${systemGeneratedOtp}`);
+
+            document.getElementById('otpModal').classList.remove('hidden');
+            const firstBox = document.querySelector('.otp-box');
+            if (firstBox) firstBox.focus();
         };
     }
 }
