@@ -485,50 +485,39 @@ function setupOtpInputsBehavior() {
 
 // --- LOGIN INTERFACE EVENT BINDINGS ---
 function setupLoginInterfaceListeners() {
+    // 1. SELECT DOM ELEMENTS
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
-    const agreeCheck = document.getElementById('agreeCheck');
     const createAccBtnEl = document.getElementById('createAccBtn');
     const loginBtnEl = document.getElementById('loginBtn');
+    const agreeCheck = document.getElementById('agreeCheck');
     
-    const termsLink = document.getElementById('termsLink');
-    const termsModal = document.getElementById('termsModal');
-    const closeTermsBtn = document.getElementById('closeTermsBtn');
-    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
-
-    // =========================================================
-    // HIDE/UNHIDE & LIVE PASSWORD INDICATOR STRENGTH TRACKING
-    // =========================================================
     const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-    const eyeIcon = document.getElementById('eyeIcon'); // The <i> element inside your button
+    const eyeIcon = document.getElementById('eyeIcon');
     
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
-    
     const ruleLength = document.getElementById('ruleLength');
     const ruleUppercase = document.getElementById('ruleUppercase');
     const ruleSpecial = document.getElementById('ruleSpecial');
 
     if (togglePasswordBtn) {
-    togglePasswordBtn.onclick = () => {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        
-        // Swap between eye and eye-slash
-        eyeIcon.classList.toggle('fa-eye');
-        eyeIcon.classList.toggle('fa-eye-slash');
-    };
-}
+        togglePasswordBtn.onclick = () => {
+            const isPassword = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+            eyeIcon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+        };
+    }
 
     if (passwordInput) {
         passwordInput.oninput = () => {
-    const val = passwordInput.value;
-    const { hasLength, hasUppercase, hasSpecial } = validatePassword(val);
+            const val = passwordInput.value;
+            const { hasLength, hasUppercase, hasSpecial } = validatePassword(val);
 
-    // Update the visual icons
-    updateRuleStyle(ruleLength, hasLength);
-    updateRuleStyle(ruleUppercase, hasUppercase);
-    updateRuleStyle(ruleSpecial, hasSpecial);
+    // Update UI Rules
+            updateRuleStyle(ruleLength, hasLength);
+            updateRuleStyle(ruleUppercase, hasUppercase);
+            updateRuleStyle(ruleSpecial, hasSpecial);
 
     // ... (Keep your strength bar code here)
 };
@@ -539,32 +528,39 @@ function setupLoginInterfaceListeners() {
     if (hasSpecial) score++;
 
     // Update Strength Bar & Text
-    if (val.length === 0) {
-        strengthBar.style.width = "0%";
-        strengthText.textContent = "Strength: Empty";
-    } else if (score === 3) {
-        strengthBar.style.width = "100%";
-        strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
-        strengthText.textContent = "Strength: Strong & Secure";
-    } else if (score === 2) {
-        strengthBar.style.width = "66%";
-        strengthBar.className = "h-full bg-amber-500 transition-all duration-300";
-        strengthText.textContent = "Strength: Medium";
-    } else {
-        strengthBar.style.width = "33%";
-        strengthBar.className = "h-full bg-red-500 transition-all duration-300";
-        strengthText.textContent = "Strength: Weak";
+    const score = (hasLength ? 1 : 0) + (hasUppercase ? 1 : 0) + (hasSpecial ? 1 : 0);
+            if (val.length === 0) {
+                strengthBar.style.width = "0%";
+                strengthText.textContent = "Strength: Empty";
+            } else if (score === 3) {
+                strengthBar.style.width = "100%";
+                strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Strong & Secure";
+            } else if (score === 2) {
+                strengthBar.style.width = "66%";
+                strengthBar.className = "h-full bg-amber-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Medium";
+            } else {
+                strengthBar.style.width = "33%";
+                strengthBar.className = "h-full bg-red-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Weak";
+            }
+        };
     }
-};
 
     // Helper to validate password criteria rule before allowing form submit triggers
-    const validatePassword = (pass) => {
-    return {
+    const validatePassword = (pass) => ({
         hasLength: pass.length >= 6,
         hasUppercase: /[A-Z]/.test(pass),
         hasSpecial: /[!@#$%^&*()-+]/.test(pass)
+    });
+
+    const updateRuleStyle = (el, condition) => {
+        if (!el) return;
+        el.className = `text-[11px] flex items-center gap-1.5 ${condition ? 'text-emerald-400' : 'text-red-400'}`;
+        el.querySelector('i').className = `fa-solid ${condition ? 'fa-circle-check' : 'fa-circle-xmark'} text-[10px]`;
     };
-};
+
     // Terms modal handlers
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
@@ -610,48 +606,37 @@ function setupLoginInterfaceListeners() {
             console.error("Email send failed:", error);
             alert("Failed to send verification email. Please try again.");
         } finally {
-            if (createAccBtnEl) {
-                createAccBtnEl.textContent = "Create Account";
-                createAccBtnEl.disabled = false;
-            }
-            if (loginBtnEl) {
-                loginBtnEl.textContent = "Login";
-                loginBtnEl.disabled = false;
+            if (createAccBtnEl) createAccBtnEl.onclick = (e) => { e.preventDefault(); handleAuth('create'); };
+            if (loginBtnEl) loginBtnEl.onclick = (e) => { e.preventDefault(); handleAuth('login'); };
             }
         }
     };
 
     // Inside setupLoginInterfaceListeners
-const handleAuthAction = (mode) => {
-    const cleanEmail = emailInput.value.trim();
-    const cleanPassword = passwordInput.value.trim();
-    
-    if (!cleanEmail || !cleanPassword) {
-        alert("Please fill in email and password fields.");
-        return;
-    }
+const handleAuth = async (mode) => {
+        const email = emailInput.value.trim();
+        const pass = passwordInput.value.trim();
+        const { hasLength, hasUppercase, hasSpecial } = validatePassword(pass);
 
-    // Use our new validator
-    const { hasLength, hasUppercase, hasSpecial } = validatePassword(cleanPassword);
-    
-    if (!hasLength || !hasUppercase || !hasSpecial) {
-        alert("Password does not meet requirements:\n- Min 6 characters\n- Include Uppercase\n- Include Special character");
-        return;
-    }
+        if (!email || !pass) return alert("Please enter email and password.");
+        if (!hasLength || !hasUppercase || !hasSpecial) {
+            return alert("Password criteria not met! Please ensure you have length (6+), Uppercase, and Special characters.");
+        }
+        if (mode === 'create' && (!agreeCheck || !agreeCheck.checked)) {
+            return alert("You must agree to the terms to proceed.");
+        }
 
-    // Proceed if valid
-    const btn = mode === 'create' ? createAccBtnEl : loginBtnEl;
-    btn.textContent = "Processing...";
-    btn.disabled = true;
+        const btn = mode === 'create' ? createAccBtnEl : loginBtnEl;
+        btn.textContent = "Sending OTP...";
+        btn.disabled = true;
 
-    systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
-    pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: mode };
+        systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
+        pendingRegistrationData = { email, password: pass, mode };
+        await sendOtpViaEmail(email, systemGeneratedOtp, mode);
+    };
 
-    sendOtpViaEmail(cleanEmail, systemGeneratedOtp, mode);
-};
-
-if (createAccBtnEl) createAccBtnEl.onclick = (e) => { e.preventDefault(); handleAuthAction('create'); };
-if (loginBtnEl) loginBtnEl.onclick = (e) => { e.preventDefault(); handleAuthAction('login'); };
+if (createAccBtnEl) createAccBtnEl.onclick = (e) => { e.preventDefault(); handleAuth('create'); };
+if (loginBtnEl) loginBtnEl.onclick = (e) => { e.preventDefault(); handleAuth('login'); };
 
     // Login handler
     if (loginBtnEl) {
