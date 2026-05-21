@@ -472,8 +472,8 @@ function setupLoginInterfaceListeners() {
 
         const templateParams = {
             to_email: recipientEmail,
-            otp_code: otpCode
-        };
+            otp_code: otpCode  // <--- This is the specific name of your variable!
+      };
 
         emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
             .then(() => {
