@@ -4,7 +4,7 @@ import {
     onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { 
-    getFirestore, collection, addDoc, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc 
+    getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc, updateDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ==========================================
@@ -23,24 +23,36 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Enforce local session persistence explicitly
+setPersistence(auth, browserLocalPersistence).catch((err) => console.error("Persistence error:", err));
+
 let currentCategoryFilter = "All";
 let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
 let cachedTasksArray = []; 
 
-// Runtime variable space to track active 2FA parameters
+// Runtime verification states
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
 
-// --- UNIVERSAL URL ROUTER UTILITY (BUILT FOR GITHUB PAGES) ---
+// --- FIXED UNIVERSAL URL ROUTER (BUILT FOR GITHUB PAGES SUBDIRECTORIES) ---
 function safeRedirect(targetPage) {
-    const currentURL = window.location.href;
-    const urlObj = new URL(currentURL);
-    const pathSegments = urlObj.pathname.split('/');
+    const urlObj = new URL(window.location.href);
+    let path = urlObj.pathname;
     
-    pathSegments[pathSegments.length - 1] = targetPage;
-    urlObj.pathname = pathSegments.join('/');
-    
+    if (path.endsWith('/')) {
+        urlObj.pathname = path + targetPage;
+    } else {
+        const lastSlashIdx = path.lastIndexOf('/');
+        const lastSegment = path.substring(lastSlashIdx + 1);
+        
+        // If the last URL segment doesn't contain an extension like '.html', treat it as a folder base
+        if (!lastSegment.includes('.')) {
+            urlObj.pathname = path + '/' + targetPage;
+        } else {
+            urlObj.pathname = path.substring(0, lastSlashIdx + 1) + targetPage;
+        }
+    }
     window.location.replace(urlObj.toString());
 }
 
@@ -49,29 +61,35 @@ onAuthStateChanged(auth, (user) => {
     const currentPath = window.location.pathname.toLowerCase();
     
     if (user) {
-        // Handle Routing for logged-in users
+        // Reroute authenticated users away from landing/auth views
         if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
             return; 
         }
-        
-        // --- INITIALIZE DASHBOARD ENGINE ---
-        injectDynamicFeatureModals();
-        initClockUtilities();
-        setupDashboardInterfaceListeners();
-        setupOtpInputsBehavior();
+        // Initialize dynamic real-time features once confirmed inside dashboard
         setupRealtimeTasks(user.email);
-        
     } else {
-        // Handle Routing for logged-out users
+        // Enforce route protection for protected dashboard areas
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
             return; 
         }
-        
-        // --- INITIALIZE AUTH ENGINE ---
-        setupLoginInterfaceListeners();
-        setupOtpInputsBehavior();
+    }
+});
+
+// --- RUNTIME LIFECYCLE INITIALIZATION ENGINE ---
+// These execute IMMEDIATELY on script injection so the app UI never freezes
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. Setup Static Auth View Listeners if present
+    setupLoginInterfaceListeners();
+    setupOtpInputsBehavior();
+
+    // 2. Setup Dashboard System Modules if present
+    const isDashboard = window.location.pathname.toLowerCase().includes("dashboard.html");
+    if (isDashboard) {
+        injectDynamicFeatureModals();
+        initClockUtilities();
+        setupDashboardInterfaceListeners();
     }
 });
 
@@ -183,8 +201,6 @@ function triggerFeatureView(featureType) {
 
 // --- DASHBOARD UI INTERFACE LISTENERS ---
 function setupDashboardInterfaceListeners() {
-    console.log("Setting up dashboard interface listeners...");
-    
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
@@ -243,7 +259,7 @@ function setupDashboardInterfaceListeners() {
                 await signOut(auth);
                 safeRedirect("index.html");
             } catch (err) {
-                console.error("Logout navigation failure:", err);
+                console.error("Logout failure:", err);
                 safeRedirect("index.html");
             }
         };
@@ -277,7 +293,6 @@ function setupDashboardInterfaceListeners() {
     if (addTaskBtnElement) {
         addTaskBtnElement.onclick = async (e) => {
             e.preventDefault();
-            e.stopPropagation();
             
             if (!auth.currentUser) {
                 alert("You must be logged in to add tasks.");
@@ -304,7 +319,6 @@ function setupDashboardInterfaceListeners() {
                     completed: false,
                     createdAt: new Date()
                 });
-                alert(`✓ Task "${title.trim()}" created successfully!`);
             } catch (error) {
                 alert("Error creating task: " + error.message);
             }
@@ -335,8 +349,8 @@ function setupRealtimeTasks(userEmail) {
             });
 
             allTasks.sort((a, b) => {
-                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt?.toMillis ? a.createdAt.toMillis() : 0);
-                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt?.toMillis ? b.createdAt.toMillis() : 0);
+                const aTime = a.createdAt?.seconds || 0;
+                const bTime = b.createdAt?.seconds || 0;
                 return bTime - aTime;
             });
 
@@ -385,7 +399,7 @@ function setupRealtimeTasks(userEmail) {
             attachDynamicItemListeners();
         });
     } catch (error) {
-        console.error("Error setting up real-time tasks query:", error);
+        console.error("Error setting up tasks sync:", error);
     }
 }
 
@@ -395,7 +409,7 @@ function attachDynamicItemListeners() {
             const targetId = e.target.getAttribute('data-id');
             try {
                 await updateDoc(doc(db, "tasks", targetId), { completed: e.target.checked });
-            } catch (err) { console.error("Task modification failed:", err); }
+            } catch (err) { console.error("Task update failed:", err); }
         };
     });
 
@@ -416,7 +430,7 @@ function setupOtpInputsBehavior() {
     if (boxes.length === 0) return;
     
     boxes.forEach((box, idx) => {
-        box.oninput = (e) => {
+        box.oninput = () => {
             box.value = box.value.replace(/[^0-9]/g, '');
             if (box.value.length === 1 && idx < boxes.length - 1) {
                 boxes[idx + 1].focus(); 
@@ -429,7 +443,6 @@ function setupOtpInputsBehavior() {
             }
         };
 
-        // Complete 6-Digit Verification Clipboard Paste Engine
         box.onpaste = (e) => {
             e.preventDefault();
             const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').substring(0, 6);
@@ -478,10 +491,8 @@ function setupOtpInputsBehavior() {
                     
                     document.getElementById('otpModal').classList.add('hidden');
                     boxes.forEach(b => b.value = '');
-                    alert("Success! Redirecting...");
                 } catch (error) {
                     alert("Authentication Failed:\n" + error.message);
-                    console.error("Auth error:", error);
                 } finally {
                     verifyOtpBtn.textContent = "Verify Securely";
                     verifyOtpBtn.disabled = false;
@@ -513,26 +524,22 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
         otp_code: otpCode
     };
 
-    try {
-        console.log("Sending OTP to:", recipientEmail);
-        const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
-        console.log("Email sent successfully:", response);
-        
-        alert(`Verification code sent to ${recipientEmail}.\n\nCheck your email and enter the 6-digit code.`);
-        
-        const otpModal = document.getElementById('otpModal');
-        if (otpModal) {
-            document.querySelectorAll('.otp-box').forEach(box => box.value = '');
-            otpModal.classList.remove('hidden');
-            const firstBox = document.querySelector('.otp-box');
-            if (firstBox) firstBox.focus();
-        }
-    } catch (error) {
-        console.error("Email send failed:", error);
-        alert("Failed to send verification email.\n\nError: " + error.message + "\n\nPlease try again.");
-        
-        systemGeneratedOtp = null;
-        pendingRegistrationData = null;
+    // Fail-safe protection if external SDK fails to load globally
+    if (typeof emailjs === 'undefined') {
+        throw new Error("EmailJS SDK script was not detected in the HTML context.");
+    }
+
+    console.log("Dispatching OTP request...");
+    await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
+    
+    alert(`Verification code sent to ${recipientEmail}.\n\nCheck your email and enter the 6-digit code.`);
+    
+    const otpModal = document.getElementById('otpModal');
+    if (otpModal) {
+        document.querySelectorAll('.otp-box').forEach(box => box.value = '');
+        otpModal.classList.remove('hidden');
+        const firstBox = document.querySelector('.otp-box');
+        if (firstBox) firstBox.focus();
     }
 }
 
@@ -544,10 +551,7 @@ async function handleAuth(mode) {
     const loginBtnEl = document.getElementById('loginBtn');
     const agreeCheck = document.getElementById('agreeCheck');
 
-    if (!emailInput || !passwordInput) {
-        alert("Input fields missing.");
-        return;
-    }
+    if (!emailInput || !passwordInput) return;
 
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
@@ -591,7 +595,8 @@ async function handleAuth(mode) {
     try {
         await sendOtpViaEmail(email, systemGeneratedOtp, mode);
     } catch (error) {
-        console.error("Auth error:", error);
+        console.error("Auth Exception:", error);
+        alert("Error during processing: " + error.message);
         if (btn) {
             btn.textContent = originalText;
             btn.disabled = originalDisabled;
@@ -601,8 +606,6 @@ async function handleAuth(mode) {
 
 // --- LOGIN INTERFACE EVENT BINDINGS ---
 function setupLoginInterfaceListeners() {
-    console.log("Initializing Auth Listeners...");
-
     const passwordInput = document.getElementById('password');
     const createAccBtnEl = document.getElementById('createAccBtn');
     const loginBtnEl = document.getElementById('loginBtn');
@@ -674,21 +677,25 @@ function setupLoginInterfaceListeners() {
         };
     }
 
+    // --- INSTANT TERMS & AGREEMENT MODAL HANDLERS ---
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
             e.preventDefault(); 
+            e.stopPropagation();
             termsModal.classList.remove('hidden'); 
         };
     }
     
     if (closeTermsBtn && termsModal) {
-        closeTermsBtn.onclick = () => { 
+        closeTermsBtn.onclick = (e) => { 
+            e.preventDefault();
             termsModal.classList.add('hidden'); 
         };
     }
     
     if (acceptTermsBtn && termsModal && agreeCheck) {
-        acceptTermsBtn.onclick = () => { 
+        acceptTermsBtn.onclick = (e) => { 
+            e.preventDefault();
             agreeCheck.checked = true; 
             termsModal.classList.add('hidden'); 
         };
