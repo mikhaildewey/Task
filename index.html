@@ -60,7 +60,7 @@
                         <i class="fa-solid fa-circle text-[6px]"></i> Must contain an Uppercase letter
                     </div>
                     <div id="ruleSpecial" class="text-[11px] text-gray-400 flex items-center gap-1.5 transition">
-                        <i class="fa-solid fa-circle text-[6px]"></i> No special characters allowed
+                        <i class="fa-solid fa-circle text-[6px]"></i> Must contain a Special character 
                     </div>
                 </div>
             </div>
@@ -118,8 +118,8 @@
                 strengthBar.style.width = "0%";
                 strengthText.textContent = "Strength: Empty";
             } else if (hasSpecial) {
-                strengthBar.style.width = "25%";
-                strengthBar.style.backgroundColor = "#ef4444";
+                strengthBar.style.width = "100%";
+                strengthBar.style.backgroundColor = "#10b981";
                 strengthText.textContent = "Strength: Strong"; 
             } else if (hasLength && hasUpper) {
                 strengthBar.style.width = "100%";
