@@ -247,16 +247,7 @@ function setupDashboardInterfaceListeners() {
                 // Hard fallback attempt
                 window.location.href = "index.html";
             }
-            } else {
-        const currentPath = window.location.pathname.toLowerCase();
-        if (currentPath.includes("dashboard.html")) {
-            // CRITICAL: Ensure this matches your file case string exactly!
-            window.location.replace("LOGIN.html"); 
-        }
-        if (loginBtn || createAccBtn) {
-            setupLoginInterfaceListeners();
-            setupOtpInputsBehavior(); 
-        }
+        };
     }
 
     const searchInput = document.getElementById('searchInput');
