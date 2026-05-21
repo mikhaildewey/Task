@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script type="module" src="app.js"></script>
 </head>
-<body class="bg-[#0F1015] h-screen flex flex-col md:flex-row overflow-hidden text-white font-sans">
+<body class="bg-[#0F1015] h-screen flex flex-col md:flex-row overflow-hidden text-white font-sans relative">
 
     <div class="md:hidden bg-[#151722] p-4 flex justify-between items-center border-b border-[#2A2D3E] z-50">
         <div class="flex items-center space-x-2">
@@ -130,6 +130,132 @@
         </div>
     </main>
 
-    <script type="module" src="app.js"></script>
+    <div id="modTasksModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60] transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md p-6 transform scale-95 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-emerald-400"></i> Create Task
+                </h3>
+                <button onclick="closeModal('modTasksModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="modTaskTitle" placeholder="Enter task objective..." class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
+            <select id="modTaskCategory" class="w-full mb-6 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
+                <option value="Work">Work</option>
+                <option value="Personal">Personal</option>
+            </select>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('modTasksModal')" class="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm font-medium">Cancel</button>
+                <button id="modSubmitTaskBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">Create Task</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modCalendarModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60] transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md p-6 transform scale-95 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days text-purple-400"></i> Schedule Task
+                </h3>
+                <button onclick="closeModal('modCalendarModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <label class="block text-xs text-gray-400 mb-1">Target Task</label>
+            <select id="modCalendarTaskSelect" class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors"></select>
+            <div class="flex gap-3 mb-6">
+                <div class="w-1/2">
+                    <label class="block text-xs text-gray-400 mb-1">Date</label>
+                    <input type="date" id="modCalendarDate" class="w-full p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors [color-scheme:dark]">
+                </div>
+                <div class="w-1/2">
+                    <label class="block text-xs text-gray-400 mb-1">Time</label>
+                    <input type="time" id="modCalendarTime" class="w-full p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors [color-scheme:dark]">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('modCalendarModal')" class="px-4 py-2 text-gray-400 hover:text-white transition-colors text-sm font-medium">Cancel</button>
+                <button id="modSubmitScheduleBtn" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors">Confirm Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modRemindersModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60] transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg p-6 transform scale-95 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-bell text-amber-400"></i> Active Reminders
+                </h3>
+                <button onclick="closeModal('modRemindersModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="modRemindersList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
+                No active reminders currently.
+            </div>
+            <div class="flex justify-end mt-4">
+                <button onclick="closeModal('modRemindersModal')" class="px-4 py-2 bg-[#2A2D3E] hover:bg-[#32364A] text-white rounded-lg text-sm font-medium transition-colors">Close Alerts</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modInboxModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[60] transition-all duration-300 opacity-0 pointer-events-none">
+        <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg p-6 transform scale-95 transition-all duration-300">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-inbox text-blue-400"></i> Inbox Logs
+                </h3>
+                <button onclick="closeModal('modInboxModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="modInboxList" class="max-h-60 overflow-y-auto space-y-2 pr-1 text-sm text-gray-400">
+                No new notifications.
+            </div>
+            <div class="flex justify-end mt-4">
+                <button onclick="closeModal('modInboxModal')" class="px-4 py-2 bg-[#2A2D3E] hover:bg-[#32364A] text-white rounded-lg text-sm font-medium transition-colors">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Define closeModal globally so the inline onclick buttons can access it
+        window.closeModal = function(modalId) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            modal.classList.remove('opacity-100');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            const inner = modal.querySelector('.modal-inner');
+            if(inner) {
+                inner.classList.remove('scale-100');
+                inner.classList.add('scale-95');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Internal function to open modals
+            const openModal = (modalId) => {
+                const modal = document.getElementById(modalId);
+                if (!modal) return;
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100');
+                const inner = modal.querySelector('.modal-inner');
+                if(inner) {
+                    inner.classList.remove('scale-95');
+                    inner.classList.add('scale-100');
+                }
+            };
+
+            // Helper function to bind click events to buttons/cards
+            const bindTrigger = (triggerId, modalId) => {
+                const trigger = document.getElementById(triggerId);
+                if (trigger) {
+                    trigger.addEventListener('click', () => openModal(modalId));
+                }
+            };
+
+            // Bind the feature cards to their respective modals
+            bindTrigger('featureCardTasks', 'modTasksModal');
+            bindTrigger('featureCardCalendar', 'modCalendarModal');
+            bindTrigger('featureCardReminders', 'modRemindersModal');
+            bindTrigger('featureCardInbox', 'modInboxModal');
+            
+            // Also bind the "Add Task" button on the priority board to the tasks modal
+            bindTrigger('addTaskBtn', 'modTasksModal');
+        });
+    </script>
 </body>
 </html>

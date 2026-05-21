@@ -91,9 +91,59 @@
         </form>
     </div>
 
+    <div id="otpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-shield-halved text-4xl text-[#7B51D3] mb-3"></i>
+                <h2 class="text-2xl font-bold text-white mb-1">Verify Your Identity</h2>
+                <p class="text-sm text-gray-400">Enter the 6-digit code sent to your email</p>
+            </div>
+
+            <div class="flex justify-center gap-2 mb-6">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
+            </div>
+
+            <div class="space-y-3">
+                <button type="button" id="verifyOtpBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">
+                    Verify Securely
+                </button>
+                <button type="button" id="cancelOtpBtn" class="w-full bg-[#252836] hover:bg-[#2A2D3E] text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="termsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 sticky top-0 bg-[#151722] pb-4">
+                <h2 class="text-xl font-bold text-white">Terms & Conditions</h2>
+                <button type="button" id="closeTermsBtn" class="text-gray-400 hover:text-white transition text-2xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="text-sm text-gray-300 space-y-4">
+                <div>
+                    <h3 class="text-[#7B51D3] font-bold mb-2">1. Acceptance of Terms</h3>
+                    <p>By using Smart Task Scheduler, you agree to these terms and conditions.</p>
+                </div>
+            </div>
+
+            <button type="button" id="acceptTermsBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md mt-6">
+                I Accept
+            </button>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Password Strength & Toggle Logic ---
+            // Password logic
             const passwordInput = document.getElementById('password');
             const togglePasswordBtn = document.getElementById('togglePasswordBtn');
             const eyeIcon = document.getElementById('eyeIcon');
@@ -106,12 +156,9 @@
                 special: document.getElementById('ruleSpecial')
             };
 
-            // FIX: Robust toggle logic with stopImmediatePropagation
             if (togglePasswordBtn && passwordInput && eyeIcon) {
                 togglePasswordBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    
-                    // This stops app.js from firing at the same time and undoing our work!
                     e.stopImmediatePropagation(); 
                     
                     const isPasswordHidden = passwordInput.getAttribute('type') === 'password';
@@ -131,7 +178,6 @@
             if (passwordInput) {
                 passwordInput.addEventListener('input', () => {
                     const val = passwordInput.value;
-                    
                     const hasLength = val.length >= 6;
                     const hasUpper = /[A-Z]/.test(val);
                     const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
@@ -140,10 +186,7 @@
                     updateRule(rules.upper, hasUpper);
                     updateRule(rules.special, hasSpecial);
 
-                    let score = 0;
-                    if (hasLength) score++;
-                    if (hasUpper) score++;
-                    if (hasSpecial) score++;
+                    let score = (hasLength ? 1 : 0) + (hasUpper ? 1 : 0) + (hasSpecial ? 1 : 0);
 
                     if (val.length === 0) {
                         strengthBar.style.width = "0%";
@@ -179,7 +222,7 @@
                 }
             }
 
-            // --- OTP Auto-Advance UX Logic ---
+            // OTP Box Navigation
             const otpBoxes = document.querySelectorAll('.otp-box');
             otpBoxes.forEach((box, index) => {
                 box.addEventListener('input', (e) => {
@@ -187,7 +230,6 @@
                         otpBoxes[index + 1].focus();
                     }
                 });
-
                 box.addEventListener('keydown', (e) => {
                     if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
                         otpBoxes[index - 1].focus();
@@ -195,20 +237,23 @@
                 });
             });
 
-            // --- Basic Terms Modal Toggle Logic ---
+            // FIXED: Cancel OTP Modal
+            const cancelOtpBtn = document.getElementById('cancelOtpBtn');
+            const otpModal = document.getElementById('otpModal');
+            if (cancelOtpBtn && otpModal) {
+                cancelOtpBtn.addEventListener('click', () => {
+                    otpModal.classList.add('hidden');
+                });
+            }
+
+            // Terms Modal
             const termsModal = document.getElementById('termsModal');
             const termsLink = document.getElementById('termsLink');
             const closeTermsBtn = document.getElementById('closeTermsBtn');
             const acceptTermsBtn = document.getElementById('acceptTermsBtn');
             const agreeCheck = document.getElementById('agreeCheck');
 
-            if (termsLink) {
-                termsLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    termsModal.classList.remove('hidden');
-                });
-            }
-
+            if (termsLink) termsLink.addEventListener('click', (e) => { e.preventDefault(); termsModal.classList.remove('hidden'); });
             const closeTerms = () => termsModal.classList.add('hidden');
             if (closeTermsBtn) closeTermsBtn.addEventListener('click', closeTerms);
             if (acceptTermsBtn) {
@@ -219,66 +264,5 @@
             }
         });
     </script>
-
-    <div id="otpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8">
-            <div class="text-center mb-6">
-                <i class="fa-solid fa-shield-halved text-4xl text-[#7B51D3] mb-3"></i>
-                <h2 class="text-2xl font-bold text-white mb-1">Verify Your Identity</h2>
-                <p class="text-sm text-gray-400">Enter the 6-digit code sent to your email</p>
-            </div>
-
-            <div class="flex justify-center gap-2 mb-6">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-                <input type="text" class="otp-box w-12 h-12 bg-[#0F1015] border border-[#2A2D3E] text-white text-center text-2xl rounded-xl focus:outline-none focus:border-[#7B51D3] transition" maxlength="1">
-            </div>
-
-            <div class="space-y-3">
-                <button type="button" id="verifyOtpBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md">
-                    Verify Securely
-                </button>
-                <button type="button" id="cancelOtpBtn" class="w-full bg-[#252836] hover:bg-[#2A2D3E] text-gray-300 font-semibold py-2.5 rounded-xl text-sm transition">
-                    Cancel
-                </button>
-            </div>
-
-            <p class="text-xs text-gray-500 text-center mt-4">Didn't receive the code? Check your spam folder.</p>
-        </div>
-    </div>
-
-    <div id="termsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl p-6 md:p-8 max-h-[80vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4 sticky top-0 bg-[#151722] pb-4">
-                <h2 class="text-xl font-bold text-white">Terms & Conditions</h2>
-                <button type="button" id="closeTermsBtn" class="text-gray-400 hover:text-white transition text-2xl">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <div class="text-sm text-gray-300 space-y-4">
-                <div>
-                    <h3 class="text-[#7B51D3] font-bold mb-2">1. Acceptance of Terms</h3>
-                    <p>By using Smart Task Scheduler, you agree to these terms and conditions.</p>
-                </div>
-                <div>
-                    <h3 class="text-[#7B51D3] font-bold mb-2">2. User Accounts</h3>
-                    <p>You are responsible for maintaining confidentiality of your account and password.</p>
-                </div>
-                <div>
-                    <h3 class="text-[#7B51D3] font-bold mb-2">3. Limitations</h3>
-                    <p>We are not liable for any indirect damages arising from your use of this service.</p>
-                </div>
-            </div>
-
-            <button type="button" id="acceptTermsBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md mt-6">
-                I Accept
-            </button>
-        </div>
-    </div>
-
 </body>
 </html>

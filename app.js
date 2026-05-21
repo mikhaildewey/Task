@@ -1,15 +1,30 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-    onAuthStateChanged, signOut, setPersistence, browserLocalPersistence
+
+import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut,
+    setPersistence,
+    browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { 
-    getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc, updateDoc 
+
+import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    where,
+    doc,
+    deleteDoc,
+    updateDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// ==========================================
-// FIREBASE CONFIGURATION OBJECT
-// ==========================================
+// ======================================================
+// FIREBASE CONFIG
+// ======================================================
 const firebaseConfig = {
     apiKey: "AIzaSyBw-u4Pzc8zqj4r_Drh6kAY8BIMFcr6gJ8",
     authDomain: "smarttask-fd2f4.firebaseapp.com",
@@ -19,33 +34,39 @@ const firebaseConfig = {
     appId: "1:854448533703:web:5f11346a36e96ae4f58ee2"
 };
 
+// ======================================================
+// INITIALIZE
+// ======================================================
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Enforce local session persistence explicitly
-setPersistence(auth, browserLocalPersistence).catch((err) => console.error("Persistence error:", err));
+setPersistence(auth, browserLocalPersistence)
+.catch(err => console.error(err));
 
-let currentCategoryFilter = "All";
-let currentSearchQuery = "";
+// ======================================================
+// GLOBALS
+// ======================================================
 let snapshotUnsubscribe = null;
-let cachedTasksArray = []; 
+let cachedTasksArray = [];
+let reminderCheckInterval = null;
 
-// Runtime verification states
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
 
-// --- FIXED UNIVERSAL URL ROUTER (BUILT FOR GITHUB PAGES SUBDIRECTORIES) ---
+// ======================================================
+// SAFE REDIRECT
+// ======================================================
 function safeRedirect(targetPage) {
     const urlObj = new URL(window.location.href);
     let path = urlObj.pathname;
-    
+
     if (path.endsWith('/')) {
         urlObj.pathname = path + targetPage;
     } else {
         const lastSlashIdx = path.lastIndexOf('/');
         const lastSegment = path.substring(lastSlashIdx + 1);
-        
+
         if (!lastSegment.includes('.')) {
             urlObj.pathname = path + '/' + targetPage;
         } else {
@@ -55,488 +76,665 @@ function safeRedirect(targetPage) {
     window.location.replace(urlObj.toString());
 }
 
-// --- CENTRAL AUTH STATE ROUTER PIPELINE ---
+// ======================================================
+// AUTH STATE
+// ======================================================
 onAuthStateChanged(auth, (user) => {
     const currentPath = window.location.pathname.toLowerCase();
-    
+
     if (user) {
-        if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
+        if (
+            currentPath.includes("index.html") ||
+            currentPath.includes("login.html") ||
+            currentPath.endsWith("/")
+        ) {
             safeRedirect("dashboard.html");
-            return; 
+            return;
         }
-        
-        // FIX: Update Dashboard UI with real account info once authenticated
+
         updateUserAccountUI(user);
         setupRealtimeTasks(user.email);
+        initializeReminderWatcher();
     } else {
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
-            return; 
         }
     }
 });
 
-// --- RUNTIME LIFECYCLE INITIALIZATION ENGINE ---
+// ======================================================
+// DOM READY
+// ======================================================
 document.addEventListener("DOMContentLoaded", () => {
     setupLoginInterfaceListeners();
     setupOtpInputsBehavior();
 
     const isDashboard = window.location.pathname.toLowerCase().includes("dashboard.html");
+
     if (isDashboard) {
-        injectDynamicFeatureModals();
+        injectModularSystemInterfaces();
         initClockUtilities();
         setupDashboardInterfaceListeners();
+        bindFeatureCardsToModals();
     }
 });
 
-// --- FIX: DISPLAY LIVE USER ACCOUNT INFO ---
+// ======================================================
+// ACCOUNT UI
+// ======================================================
 function updateUserAccountUI(user) {
     if (!user) return;
-    
-    // Grabs the part before the '@' sign as a fallback username
-    const username = user.email.split('@')[0]; 
-    
-    // Targets common element patterns for your profile/account button loader
-    const accountElements = [
-        document.getElementById('userAccountName'),
-        document.getElementById('accountInfoBtn'),
-        document.querySelector('.loading-account-info'), 
-        // Handles text nodes inside elements that say "Loading Account Info..."
-        ...Array.from(document.querySelectorAll('*')).filter(el => el.textContent.trim() === "Loading Account Info...")
-    ];
 
-    accountElements.forEach(el => {
-        if (el) {
-            // Replaces loading state with the actual user's email or username
-            el.innerHTML = `<i class="fa-solid fa-user-circle mr-2 text-purple-400"></i> ${username}`;
-        }
-    });
+    const username = user.email.split('@')[0];
+    const el = document.getElementById("userAccountName");
+
+    if (el) {
+        el.innerHTML = `
+            <i class="fa-solid fa-user-circle mr-2 text-purple-400"></i>
+            ${username}
+        `;
+    }
 }
 
-// --- TIME CLOCK ROUTINE ---
+// ======================================================
+// CLOCK & GREETINGS SYNCHRONIZATION
+// ======================================================
 function initClockUtilities() {
-    const timeEl = document.getElementById('liveTime') || document.querySelector('.text-xl.font-bold');
-    const dateEl = document.getElementById('liveDate') || document.querySelector('.text-purple-200.text-sm');
-    
+    const timeEl = document.getElementById('liveTime');
+    const dateEl = document.getElementById('liveDate');
+
     function refreshClock() {
         const now = new Date();
-        if(timeEl) timeEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        if(dateEl) dateEl.textContent = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+        if (timeEl) {
+            timeEl.textContent = now.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        if (dateEl) {
+            dateEl.textContent = now.toLocaleDateString([], {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+        
+        // Sync greeting perfectly with the active clock
+        updateDynamicGreeting(now.getHours());
     }
+
     refreshClock();
     setInterval(refreshClock, 1000);
 }
 
-// --- DYNAMICALLY INJECT COMPONENT MODALS TO DOM ---
-function injectDynamicFeatureModals() {
-    if (document.getElementById('featureModalContainer')) return;
+function updateDynamicGreeting(hour) {
+    const greetingEl = document.getElementById('dynamicGreeting');
+    if (!greetingEl) return;
 
-    const modalWrapper = document.createElement('div');
-    modalWrapper.id = 'featureModalContainer';
-    modalWrapper.innerHTML = `
-        <div id="utilityModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-all duration-200">
-            <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
-                <div class="p-4 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
-                    <h3 id="utilityModalTitle" class="text-base font-bold text-white flex items-center gap-2"></h3>
-                    <button type="button" id="closeUtilityModalBtn" class="text-gray-400 hover:text-white transition text-lg p-1">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+    let greeting = "Good Evening";
+
+    if (hour >= 5 && hour < 12) {
+        greeting = "Good Morning";
+    } else if (hour >= 12 && hour < 18) {
+        greeting = "Good Afternoon";
+    }
+
+    // Only update the DOM if it actually changes to save resources
+    if (greetingEl.textContent !== greeting) {
+        greetingEl.textContent = greeting;
+    }
+}
+
+// ======================================================
+// REMINDERS REALTIME CRON
+// ======================================================
+function initializeReminderWatcher() {
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    if (reminderCheckInterval) {
+        clearInterval(reminderCheckInterval);
+    }
+
+    reminderCheckInterval = setInterval(async () => {
+        const now = new Date();
+
+        for (const task of cachedTasksArray) {
+            if (!task.reminderDateTime) continue;
+            if (task.completed) continue;
+            if (task.reminderTriggered) continue;
+
+            const reminderTime = new Date(task.reminderDateTime);
+            const diff = reminderTime.getTime() - now.getTime();
+
+            if (diff <= 60000 && diff >= 0) {
+                if (Notification.permission === "granted") {
+                    new Notification("⏰ Task Reminder", {
+                        body: `${task.title} is scheduled now.`
+                    });
+                }
+
+                alert(`Reminder:\n\n${task.title}\n\nTime has arrived.`);
+                task.reminderTriggered = true;
+
+                try {
+                    await updateDoc(doc(db, "tasks", task.id), {
+                        reminderTriggered: true
+                    });
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        }
+    }, 10000);
+}
+
+// ======================================================
+// MODAL ANIMATION HANDLERS (FRESH & SMOOTH)
+// ======================================================
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    // Remove hidden/pointer locks, add opacity
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.classList.add('opacity-100');
+    
+    // Scale up the inner content box
+    const innerBox = modal.querySelector('.modal-inner');
+    if (innerBox) {
+        innerBox.classList.remove('scale-95');
+        innerBox.classList.add('scale-100');
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    // Fade out
+    modal.classList.remove('opacity-100');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    
+    // Scale down the inner content box
+    const innerBox = modal.querySelector('.modal-inner');
+    if (innerBox) {
+        innerBox.classList.remove('scale-100');
+        innerBox.classList.add('scale-95');
+    }
+}
+
+// ======================================================
+// INJECT MODULAR COMPONENT INTERFACES
+// ======================================================
+function injectModularSystemInterfaces() {
+    if (document.getElementById('modularSystemContainer')) return;
+
+    const container = document.createElement('div');
+    container.id = 'modularSystemContainer';
+    // Note: Replaced 'hidden' with smooth transition classes
+    container.innerHTML = `
+        <div id="modTasksModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 transition-all duration-300 opacity-0 pointer-events-none">
+            <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md p-6 transform scale-95 transition-all duration-300 shadow-2xl shadow-emerald-900/10">
+                <h3 class="text-white text-xl font-bold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-emerald-400"></i> My Tasks Manager
+                </h3>
+                <input type="text" id="modTaskTitle" placeholder="Enter task objective..." 
+                       class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
+                <select id="modTaskCategory" class="w-full mb-6 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
+                    <option value="Work">Work Category</option>
+                    <option value="Personal">Personal Category</option>
+                </select>
+                <div class="flex justify-end gap-3">
+                    <button id="closeTasksModalBtn" class="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                    <button id="modSubmitTaskBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-emerald-600/20">Create Task</button>
                 </div>
-                <div id="utilityModalBody" class="p-5 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-4"></div>
+            </div>
+        </div>
+
+        <div id="modCalendarModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 transition-all duration-300 opacity-0 pointer-events-none">
+            <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md p-6 transform scale-95 transition-all duration-300 shadow-2xl shadow-purple-900/10">
+                <h3 class="text-white text-xl font-bold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days text-purple-400"></i> Calendar Scheduler
+                </h3>
+                <label class="block text-xs text-gray-400 mb-1">Select Core Target Task</label>
+                <select id="modCalendarTaskSelect" class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors">
+                    </select>
+                <div class="flex gap-3 mb-6">
+                    <div class="w-1/2">
+                        <label class="block text-xs text-gray-400 mb-1">Target Date</label>
+                        <input type="date" id="modCalendarDate" class="w-full p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors [color-scheme:dark]">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="block text-xs text-gray-400 mb-1">Trigger Time</label>
+                        <input type="time" id="modCalendarTime" class="w-full p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors [color-scheme:dark]">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button id="closeCalendarModalBtn" class="px-4 py-2 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                    <button id="modSubmitScheduleBtn" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-purple-600/20">Commit Schedule</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modRemindersModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 transition-all duration-300 opacity-0 pointer-events-none">
+            <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg p-6 transform scale-95 transition-all duration-300 shadow-2xl shadow-amber-900/10">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-bell text-amber-400"></i> Active Alert Reminders
+                    </h3>
+                    <button id="closeRemindersModalBtn" class="text-gray-400 hover:text-white transition-colors text-lg">✕</button>
+                </div>
+                <div id="modRemindersList" class="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    </div>
+            </div>
+        </div>
+
+        <div id="modInboxModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 transition-all duration-300 opacity-0 pointer-events-none">
+            <div class="modal-inner bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg p-6 transform scale-95 transition-all duration-300 shadow-2xl shadow-blue-900/10">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-inbox text-blue-400"></i> Notification Inbox Logs
+                    </h3>
+                    <button id="closeInboxModalBtn" class="text-gray-400 hover:text-white transition-colors text-lg">✕</button>
+                </div>
+                <div id="modInboxList" class="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    </div>
             </div>
         </div>
     `;
-    document.body.appendChild(modalWrapper);
+    document.body.appendChild(container);
 
-    document.getElementById('closeUtilityModalBtn').onclick = () => {
-        document.getElementById('utilityModal').classList.add('hidden');
+    setupModuleSubmissionListeners();
+}
+
+// ======================================================
+// INTERFACE MODULE LOGIC SUBMISSIONS & BUTTON BINDINGS
+// ======================================================
+function setupModuleSubmissionListeners() {
+    
+    // --- Cancel / Close Buttons Bindings ---
+    document.getElementById('closeTasksModalBtn').onclick = () => closeModal('modTasksModal');
+    document.getElementById('closeCalendarModalBtn').onclick = () => closeModal('modCalendarModal');
+    document.getElementById('closeRemindersModalBtn').onclick = () => closeModal('modRemindersModal');
+    document.getElementById('closeInboxModalBtn').onclick = () => closeModal('modInboxModal');
+
+    // --- Submit Basic Task (My Tasks) ---
+    document.getElementById('modSubmitTaskBtn').onclick = async () => {
+        const title = document.getElementById('modTaskTitle').value.trim();
+        const category = document.getElementById('modTaskCategory').value;
+
+        if (!title) {
+            alert("Task objective cannot be blank.");
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "tasks"), {
+                userEmail: auth.currentUser.email,
+                title: title,
+                category: category,
+                date: null,
+                time: null,
+                reminderDateTime: null,
+                reminderTriggered: false,
+                completed: false,
+                createdAt: new Date()
+            });
+
+            closeModal('modTasksModal');
+            document.getElementById('modTaskTitle').value = ""; // Reset input
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // --- Update Task with Schedule (Calendar) ---
+    document.getElementById('modSubmitScheduleBtn').onclick = async () => {
+        const taskId = document.getElementById('modCalendarTaskSelect').value;
+        const date = document.getElementById('modCalendarDate').value;
+        const time = document.getElementById('modCalendarTime').value;
+
+        if (!taskId || !date || !time) {
+            alert("Please select a task and set both date and time.");
+            return;
+        }
+
+        const combinedDateTime = `${date}T${time}:00`;
+
+        try {
+            await updateDoc(doc(db, "tasks", taskId), {
+                date: date,
+                time: new Date(combinedDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                reminderDateTime: combinedDateTime,
+                reminderTriggered: false
+            });
+
+            closeModal('modCalendarModal');
+        } catch (err) {
+            alert(err.message);
+        }
     };
 }
 
-function triggerFeatureView(featureType) {
-    const modal = document.getElementById('utilityModal');
-    const titleEl = document.getElementById('utilityModalTitle');
-    const bodyEl = document.getElementById('utilityModalBody');
-    if (!modal || !titleEl || !bodyEl) return;
-
-    bodyEl.innerHTML = ''; 
-
-    if (featureType === 'Calendar') {
-        titleEl.innerHTML = `<i class="fa-solid fa-calendar text-purple-400"></i> Local Schedule Planner`;
-        bodyEl.innerHTML = `
-            <p class="text-gray-400 text-xs mb-2">Select a date path tracking point to synchronize your scheduling overview indices:</p>
-            <input type="date" value="${new Date().toISOString().split('T')[0]}" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition mb-4">
-            <div class="text-[11px] font-bold text-purple-400 tracking-wider uppercase mb-1">Active Tasks Set for Today:</div>
-            <div class="space-y-2 max-h-[200px] overflow-y-auto">
-                ${cachedTasksArray.length === 0 ? '<p class="text-gray-500 text-xs italic">No schedule logs recorded today.</p>' : 
-                  cachedTasksArray.map(t => `
-                    <div class="bg-[#1A1C28] p-2.5 rounded-lg border border-[#2A2D3E] flex justify-between items-center">
-                        <span class="truncate ${t.completed ? 'line-through text-gray-500' : 'text-gray-200'}">${t.title}</span>
-                        <span class="text-[10px] bg-[#252836] text-gray-400 px-2 py-0.5 rounded">${t.time}</span>
-                    </div>
-                  `).join('')}
-            </div>
-        `;
-    } 
-    else if (featureType === 'Reminders') {
-        titleEl.innerHTML = `<i class="fa-solid fa-bell text-amber-400"></i> System Alerts & Deadlines`;
-        const pendingTasks = cachedTasksArray.filter(t => !t.completed);
-        bodyEl.innerHTML = `
-            <p class="text-gray-400 text-xs mb-3">Active tracking rules are monitoring outstanding tasks remaining item deadlines:</p>
-            <div class="space-y-2">
-                ${pendingTasks.length === 0 ? `
-                    <div class="text-center py-4 text-emerald-400 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-xs font-medium">
-                        <i class="fa-solid fa-circle-check mr-1"></i> All systems clear! No pending reminders.
-                    </div>` : 
-                  pendingTasks.map(t => `
-                    <div class="bg-[#1A1C28] p-3 rounded-xl border-l-2 border-amber-500 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-semibold text-gray-200">${t.title}</p>
-                            <p class="text-[10px] text-gray-500 mt-0.5">Category: ${t.category}</p>
-                        </div>
-                        <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded">
-                            <i class="fa-regular fa-clock mr-1"></i>${t.time}
-                        </span>
-                    </div>
-                  `).join('')}
-            </div>
-        `;
-    } 
-    else if (featureType === 'Inbox') {
-        titleEl.innerHTML = `<i class="fa-solid fa-inbox text-blue-400"></i> Workspace Tracking Notifications`;
-        bodyEl.innerHTML = `
-            <div class="space-y-2">
-                <div class="bg-[#1A1C28] p-3 rounded-xl border border-[#2A2D3E] opacity-90">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-xs font-bold text-blue-400">Database Sync Module</span>
-                        <span class="text-[9px] text-gray-500">Just now</span>
-                    </div>
-                    <p class="text-[11px] text-gray-300">Firestore streaming connection running successfully. Active logs cache initialized properly.</p>
-                </div>
-            </div>
-        `;
-    }
-    modal.classList.remove('hidden'); 
-}
-
-// --- DASHBOARD UI INTERFACE LISTENERS ---
-function setupDashboardInterfaceListeners() {
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    const sidebar = document.getElementById('sidebar');
-    const targetBoard = document.getElementById('priorityTasksBoard');
-    const addTaskBtnElement = document.getElementById('addTaskBtn');
-
-    const jumpToSection = (element) => {
-        if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-
-    ['sideNavHome'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.onclick = () => {
-            const topDashboardCard = document.querySelector('.bg-gradient-to-r');
-            if (topDashboardCard) topDashboardCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        };
-    });
-
-    ['sideNavTasks', 'featureCardTasks'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.onclick = () => jumpToSection(targetBoard);
-    });
-
-    ['sideNavCalendar', 'featureCardCalendar'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.onclick = () => triggerFeatureView('Calendar');
-    });
-
-    ['sideNavReminders', 'featureCardReminders'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.onclick = () => triggerFeatureView('Reminders');
-    });
-
-    ['sideNavInbox', 'featureCardInbox'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.onclick = () => triggerFeatureView('Inbox');
-    });
-
-    if (mobileMenuBtn && sidebar) {
-        mobileMenuBtn.onclick = (e) => {
-            e.stopPropagation();
-            sidebar.classList.toggle('-translate-x-full');
-        };
-        document.body.onclick = () => {
-            sidebar.classList.add('-translate-x-full');
-        };
-    }
-
-    const logoutBtnElement = document.getElementById('logoutBtn');
-    if (logoutBtnElement) {
-        logoutBtnElement.onclick = async () => {
-            try {
-                if (snapshotUnsubscribe) {
-                    snapshotUnsubscribe();
-                    snapshotUnsubscribe = null;
-                }
-                await signOut(auth);
-                safeRedirect("index.html");
-            } catch (err) {
-                console.error("Logout failure:", err);
-                safeRedirect("index.html");
-            }
-        };
-    }
-
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.oninput = (e) => {
-            currentSearchQuery = e.target.value.toLowerCase().trim();
-            if (auth.currentUser) setupRealtimeTasks(auth.currentUser.email); 
-        };
-    }
-
-    const filters = { 'filterAll': 'All', 'filterWork': 'Work', 'filterPersonal': 'Personal' };
-    Object.keys(filters).forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.onclick = () => {
-                currentCategoryFilter = filters[id];
-                document.querySelectorAll('.filter-btn').forEach(b => {
-                    b.classList.remove('bg-[#252836]', 'text-white');
-                    b.classList.add('text-gray-400');
-                });
-                btn.classList.add('bg-[#252836]', 'text-white');
-                btn.classList.remove('text-gray-400');
-                if (auth.currentUser) setupRealtimeTasks(auth.currentUser.email);
+// ======================================================
+// BIND FEATURE CARDS DIRECTLY TO INDEPENDENT MODALS
+// ======================================================
+function bindFeatureCardsToModals() {
+    // Scans UI logically by text to bind the module cards smoothly
+    document.querySelectorAll('div, button, section').forEach(element => {
+        if (!element.children || element.children.length === 0) return;
+        
+        const contentText = element.innerText || "";
+        
+        if (contentText.includes("My Tasks") && element.classList.contains("border")) {
+            element.style.cursor = "pointer";
+            element.classList.add("hover:border-emerald-500/50", "transition-colors");
+            element.onclick = () => openModal('modTasksModal');
+        }
+        else if (contentText.includes("Calendar") && element.classList.contains("border")) {
+            element.style.cursor = "pointer";
+            element.classList.add("hover:border-purple-500/50", "transition-colors");
+            element.onclick = () => {
+                populateCalendarDropdown();
+                const now = new Date();
+                document.getElementById('modCalendarDate').value = now.toISOString().split('T')[0];
+                document.getElementById('modCalendarTime').value = "12:00";
+                openModal('modCalendarModal');
+            };
+        }
+        else if (contentText.includes("Reminders") && element.classList.contains("border")) {
+            element.style.cursor = "pointer";
+            element.classList.add("hover:border-amber-500/50", "transition-colors");
+            element.onclick = () => {
+                populateActiveRemindersPanel();
+                openModal('modRemindersModal');
+            };
+        }
+        else if (contentText.includes("Inbox") && element.classList.contains("border")) {
+            element.style.cursor = "pointer";
+            element.classList.add("hover:border-blue-500/50", "transition-colors");
+            element.onclick = () => {
+                populateInboxLogsPanel();
+                openModal('modInboxModal');
             };
         }
     });
+}
 
-    if (addTaskBtnElement) {
-        addTaskBtnElement.onclick = async (e) => {
+// ======================================================
+// DYNAMIC COMPONENT POPULATORS
+// ======================================================
+function populateCalendarDropdown() {
+    const select = document.getElementById('modCalendarTaskSelect');
+    if (!select) return;
+    select.innerHTML = '';
+
+    const unscheduledTasks = cachedTasksArray.filter(t => !t.completed);
+    
+    if (unscheduledTasks.length === 0) {
+        select.innerHTML = '<option value="">No active tasks available</option>';
+        return;
+    }
+
+    unscheduledTasks.forEach(task => {
+        const option = document.createElement('option');
+        option.value = task.id;
+        option.textContent = `${task.title} (${task.category})`;
+        select.appendChild(option);
+    });
+}
+
+function populateActiveRemindersPanel() {
+    const container = document.getElementById('modRemindersList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const scheduled = cachedTasksArray.filter(t => t.reminderDateTime && !t.reminderTriggered && !t.completed);
+
+    if (scheduled.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 py-4 text-center">No active upcoming alert traces found.</p>';
+        return;
+    }
+
+    scheduled.forEach(t => {
+        const div = document.createElement('div');
+        div.className = "bg-[#1E2030] p-3 rounded-xl border border-[#2A2D3E] flex justify-between items-center transition-all hover:border-amber-500/30";
+        div.innerHTML = `
+            <div>
+                <p class="text-white text-sm font-medium">${t.title}</p>
+                <p class="text-xs text-amber-400 mt-0.5"><i class="fa-solid fa-clock mr-1"></i> Trigger: ${t.date} @ ${t.time}</p>
+            </div>
+            <span class="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">${t.category}</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function populateInboxLogsPanel() {
+    const container = document.getElementById('modInboxList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const firedLogs = cachedTasksArray.filter(t => t.reminderTriggered);
+
+    if (firedLogs.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 py-4 text-center">Your notification tracking feed is empty.</p>';
+        return;
+    }
+
+    firedLogs.forEach(t => {
+        const div = document.createElement('div');
+        div.className = "bg-[#1E2030]/60 p-3 rounded-xl border border-blue-500/10 flex justify-between items-center opacity-80 transition-all hover:opacity-100";
+        div.innerHTML = `
+            <div>
+                <p class="text-gray-300 text-sm line-through">${t.title}</p>
+                <p class="text-xs text-blue-400 mt-0.5"><i class="fa-solid fa-circle-check mr-1"></i> Fired Notification Log Checked</p>
+            </div>
+            <span class="text-xs text-gray-400">${t.time || "Done"}</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// ======================================================
+// DASHBOARD GENERAL ACTIONS LISTENERS
+// ======================================================
+function setupDashboardInterfaceListeners() {
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            try {
+                await signOut(auth);
+                safeRedirect("index.html");
+            } catch (err) {
+                console.error(err);
+            }
+        };
+    }
+
+    if (addTaskBtn) {
+        addTaskBtn.onclick = (e) => {
             e.preventDefault();
-            
             if (!auth.currentUser) {
-                alert("You must be logged in to add tasks.");
+                alert("Login required.");
                 return;
             }
-
-            const title = prompt("Enter task title:");
-            if (!title || !title.trim()) return;
-            
-            const categoryInput = prompt("Select category:\n\nType 'Work' or 'Personal'", "Work");
-            let finalCategory = "Work";
-            if (categoryInput && categoryInput.toLowerCase() === 'personal') {
-                finalCategory = "Personal";
-            }
-
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            try {
-                await addDoc(collection(db, "tasks"), {
-                    userEmail: auth.currentUser.email, 
-                    title: title.trim(),
-                    category: finalCategory,
-                    time: timeStr,
-                    completed: false,
-                    createdAt: new Date()
-                });
-            } catch (error) {
-                alert("Error creating task: " + error.message);
-            }
+            openModal('modTasksModal');
         };
     }
 }
 
-// --- DATA READ QUERY RENDERING PIPELINE STREAM ---
+// ======================================================
+// REALTIME CORE DATASTREAM TASKS FEED
+// ======================================================
 function setupRealtimeTasks(userEmail) {
-    if (snapshotUnsubscribe) snapshotUnsubscribe(); 
+    if (snapshotUnsubscribe) {
+        snapshotUnsubscribe();
+    }
 
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
-    try {
-        const q = query(collection(db, "tasks"), where("userEmail", "==", userEmail));
+    const q = query(
+        collection(db, "tasks"),
+        where("userEmail", "==", userEmail)
+    );
 
-        snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
-            taskList.innerHTML = '';
-            cachedTasksArray = []; 
-            let total = 0, completedCount = 0, pendingCount = 0;
+    snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
+        taskList.innerHTML = '';
+        cachedTasksArray = [];
 
-            const allTasks = [];
-            snapshot.forEach((docSnapshot) => {
-                const task = docSnapshot.data();
-                const id = docSnapshot.id;
-                allTasks.push({ id, ...task });
-            });
+        snapshot.forEach((docSnapshot) => {
+            const task = docSnapshot.data();
+            const id = docSnapshot.id;
 
-            allTasks.sort((a, b) => {
-                const aTime = a.createdAt?.seconds || 0;
-                const bTime = b.createdAt?.seconds || 0;
-                return bTime - aTime;
-            });
+            const fullTask = { id, ...task };
+            cachedTasksArray.push(fullTask);
 
-            allTasks.forEach((task) => {
-                const id = task.id;
-                cachedTasksArray.push(task);
-
-                total++;
-                if (task.completed) completedCount++; else pendingCount++;
-
-                if (currentCategoryFilter !== "All" && task.category !== currentCategoryFilter) return;
-                if (currentSearchQuery && !task.title.toLowerCase().includes(currentSearchQuery)) return;
-
-                const row = document.createElement('div');
-                row.className = `flex items-center justify-between bg-[#1E2030] p-4 rounded-xl mb-1 border border-transparent hover:border-[#7B51D3] transition group ${task.completed ? 'opacity-50' : ''}`;
-                const tagColorClass = task.category === 'Work' ? 'bg-[#7B51D3]/20 text-[#9366F9]' : 'bg-emerald-500/20 text-emerald-400';
-
-                row.innerHTML = `
-                    <div class="flex items-center space-x-4 flex-1 min-w-0">
-                        <input type="checkbox" data-id="${id}" ${task.completed ? 'checked' : ''} class="task-toggle-checkbox w-5 h-5 rounded bg-[#0F1015] border-gray-600 text-[#7B51D3] focus:ring-[#7B51D3] cursor-pointer accent-[#7B51D3]">
-                        <div class="truncate">
-                            <p class="font-semibold text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-200'} truncate">${task.title}</p>
-                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                                <span class="${tagColorClass} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">${task.category}</span>
-                                <span><i class="fa-regular fa-clock mr-1"></i>${task.time}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <button data-id="${id}" class="delete-task-btn text-gray-500 hover:text-red-400 text-xs font-semibold md:opacity-0 group-hover:opacity-100 transition px-2 py-1">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
-                `;
-                taskList.appendChild(row);
-            });
-
-            if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
-            if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
-            if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
+            const row = document.createElement('div');
+            row.className = "bg-[#1E2030] p-4 rounded-xl mb-2 flex justify-between items-center border border-[#2A2D3E]/40 hover:border-purple-500/30 transition-all group";
             
-            const badgeTasks = document.getElementById('sideBadgeTasks') || document.querySelector('aside span.bg-\\[\\#252836\\]');
-            if (badgeTasks) badgeTasks.textContent = pendingCount;
-
-            if (taskList.children.length === 0) {
-                taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
-            }
-            attachDynamicItemListeners();
+            row.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" data-id="${id}" 
+                        ${task.completed ? "checked" : ""} 
+                        class="task-toggle-checkbox accent-purple-500 h-4 w-4 rounded cursor-pointer transition-transform hover:scale-110">
+                    <div>
+                        <p class="${task.completed ? 'line-through text-gray-500' : 'text-white font-medium transition-colors group-hover:text-purple-100'}">
+                            ${task.title}
+                        </p>
+                        <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                            <span class="text-purple-400 font-medium">${task.category}</span> 
+                            • 
+                            <span class="${task.date ? 'text-gray-300' : 'text-gray-500 italic'}">
+                                <i class="fa-regular fa-calendar-check text-[10px]"></i> ${task.date ? `${task.date} at ${task.time}` : "Unscheduled Plan"}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <button data-id="${id}" class="delete-task-btn text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100">Remove</button>
+            `;
+            taskList.appendChild(row);
         });
-    } catch (error) {
-        console.error("Error setting up tasks sync:", error);
-    }
+
+        // Sync contents live if modals are open
+        const calendarModal = document.getElementById('modCalendarModal');
+        const remindersModal = document.getElementById('modRemindersModal');
+        const inboxModal = document.getElementById('modInboxModal');
+
+        if (calendarModal && calendarModal.classList.contains('opacity-100')) populateCalendarDropdown();
+        if (remindersModal && remindersModal.classList.contains('opacity-100')) populateActiveRemindersPanel();
+        if (inboxModal && inboxModal.classList.contains('opacity-100')) populateInboxLogsPanel();
+
+        attachDynamicItemListeners();
+    });
 }
 
+// ======================================================
+// TASK ITEM INTERACTIVE ACTIONS
+// ======================================================
 function attachDynamicItemListeners() {
     document.querySelectorAll('.task-toggle-checkbox').forEach(box => {
         box.onchange = async (e) => {
-            const targetId = e.target.getAttribute('data-id');
+            const id = e.target.getAttribute('data-id');
             try {
-                await updateDoc(doc(db, "tasks", targetId), { completed: e.target.checked });
-            } catch (err) { console.error("Task update failed:", err); }
+                await updateDoc(doc(db, "tasks", id), {
+                    completed: e.target.checked
+                });
+            } catch (err) {
+                console.error(err);
+            }
         };
     });
 
     document.querySelectorAll('.delete-task-btn').forEach(btn => {
         btn.onclick = async (e) => {
-            e.stopPropagation();
-            const targetId = e.currentTarget.getAttribute('data-id');
-            if (confirm("Permanently delete this task item?")) {
-                try { await deleteDoc(doc(db, "tasks", targetId)); } catch (err) { console.error("Deletion failed:", err); }
+            const id = e.target.getAttribute('data-id');
+            try {
+                await deleteDoc(doc(db, "tasks", id));
+            } catch (err) {
+                console.error(err);
             }
         };
     });
 }
 
-// --- OTP FIELD NAVIGATION ROUTINES ---
+// ======================================================
+// OTP INPUTS
+// ======================================================
 function setupOtpInputsBehavior() {
     const boxes = document.querySelectorAll('.otp-box');
+    const verifyBtn = document.getElementById('verifyOtpBtn');
+
     if (boxes.length === 0) return;
-    
+
     boxes.forEach((box, idx) => {
         box.oninput = () => {
             box.value = box.value.replace(/[^0-9]/g, '');
-            if (box.value.length === 1 && idx < boxes.length - 1) {
-                boxes[idx + 1].focus(); 
+            if (box.value && idx < boxes.length - 1) {
+                boxes[idx + 1].focus();
             }
-        };
-        
-        box.onkeydown = (e) => {
-            if (e.key === "Backspace" && box.value.length === 0 && idx > 0) {
-                boxes[idx - 1].focus(); 
-            }
-        };
-
-        box.onpaste = (e) => {
-            e.preventDefault();
-            const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').substring(0, 6);
-            const characters = pasteData.split('');
-            
-            boxes.forEach((b, i) => {
-                if (characters[i]) {
-                    b.value = characters[i];
-                    if (i < boxes.length - 1) boxes[i + 1].focus();
-                }
-            });
         };
     });
 
-    const cancelOtpBtn = document.getElementById('cancelOtpBtn');
-    if (cancelOtpBtn) {
-        cancelOtpBtn.onclick = () => {
-            document.getElementById('otpModal').classList.add('hidden');
-            systemGeneratedOtp = null;
-            pendingRegistrationData = null;
-            boxes.forEach(b => b.value = '');
-        };
-    }
+    if (verifyBtn) {
+        verifyBtn.onclick = async () => {
+            let enteredOtp = "";
+            boxes.forEach(box => { enteredOtp += box.value; });
 
-    const verifyOtpBtn = document.getElementById('verifyOtpBtn');
-    if (verifyOtpBtn) {
-        verifyOtpBtn.onclick = async () => {
-            let combinedUserEntry = "";
-            boxes.forEach(b => combinedUserEntry += b.value);
-
-            if (combinedUserEntry.length !== 6) {
-                alert("Please enter all 6 digits.");
+            if (enteredOtp !== String(systemGeneratedOtp)) {
+                alert("Invalid OTP code.");
                 return;
             }
 
-            if (combinedUserEntry === String(systemGeneratedOtp)) {
-                try {
-                    verifyOtpBtn.textContent = "Verifying...";
-                    verifyOtpBtn.disabled = true;
-                    
-                    if (pendingRegistrationData.mode === 'create') {
-                        await createUserWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
-                    } else {
-                        await signInWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
-                    }
-                    
-                    document.getElementById('otpModal').classList.add('hidden');
-                    boxes.forEach(b => b.value = '');
-                } catch (error) {
-                    alert("Authentication Failed:\n" + error.message);
-                } finally {
-                    verifyOtpBtn.textContent = "Verify Securely";
-                    verifyOtpBtn.disabled = false;
+            try {
+                if (pendingRegistrationData.mode === "create") {
+                    await createUserWithEmailAndPassword(
+                        auth,
+                        pendingRegistrationData.email,
+                        pendingRegistrationData.password
+                    );
+                } else {
+                    await signInWithEmailAndPassword(
+                        auth,
+                        pendingRegistrationData.email,
+                        pendingRegistrationData.password
+                    );
                 }
-            } else {
-                alert("Incorrect OTP code. Please try again.");
-                boxes.forEach(b => b.value = '');
-                boxes[0].focus();
+
+                alert("Authentication successful.");
+                safeRedirect("dashboard.html");
+            } catch (err) {
+                alert(err.message);
             }
         };
     }
 }
 
-// --- PASSWORD VALIDATION HELPER ---
+// ======================================================
+// PASSWORD VALIDATION
+// ======================================================
 function validatePassword(password) {
     const hasLength = password.length >= 6;
     const hasUppercase = /[A-Z]/.test(password);
     const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
     return { hasLength, hasUppercase, hasSpecial };
 }
 
-// --- SEND OTP VIA EMAIL ---
-async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
-    const SERVICE_ID = "service_u4kqk8s"; 
+// ======================================================
+// EMAIL OTP
+// ======================================================
+async function sendOtpViaEmail(recipientEmail, otpCode) {
+    const SERVICE_ID = "service_u4kqk8s";
     const TEMPLATE_ID = "template_enyyyzs";
 
     const templateParams = {
@@ -545,202 +743,66 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
     };
 
     if (typeof emailjs === 'undefined') {
-        throw new Error("EmailJS SDK script was not detected in the HTML context.");
+        throw new Error("EmailJS SDK missing.");
     }
 
-    console.log("Dispatching OTP request...");
     await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
-    
-    alert(`Verification code sent to ${recipientEmail}.\n\nCheck your email and enter the 6-digit code.`);
-    
+    alert(`OTP sent to ${recipientEmail}`);
+
     const otpModal = document.getElementById('otpModal');
     if (otpModal) {
-        document.querySelectorAll('.otp-box').forEach(box => box.value = '');
         otpModal.classList.remove('hidden');
-        const firstBox = document.querySelector('.otp-box');
-        if (firstBox) firstBox.focus();
     }
 }
 
-// --- HANDLE AUTH (LOGIN / CREATE ACCOUNT) ---
+// ======================================================
+// HANDLE AUTH
+// ======================================================
 async function handleAuth(mode) {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
-    const createAccBtnEl = document.getElementById('createAccBtn');
-    const loginBtnEl = document.getElementById('loginBtn');
-    const agreeCheck = document.getElementById('agreeCheck');
-
-    if (!emailInput || !passwordInput) return;
 
     const email = emailInput.value.trim();
-    const pass = passwordInput.value.trim();
-    
-    if (!email || !pass) {
-        alert("Please fill in email and password fields.");
+    const password = passwordInput.value.trim();
+
+    if (!email || !password) {
+        alert("Fill all fields.");
         return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        alert("Please enter a valid email address.");
-        return;
-    }
+    const { hasLength, hasUppercase, hasSpecial } = validatePassword(password);
 
-    const { hasLength, hasUppercase, hasSpecial } = validatePassword(pass);
     if (!hasLength || !hasUppercase || !hasSpecial) {
-        alert("Password does not meet requirements:\n- Min 6 characters\n- Include Uppercase\n- Include Special character");
+        alert("Password needs:\n- 6 chars\n- uppercase\n- special char");
         return;
-    }
-
-    if (mode === "create" && agreeCheck && !agreeCheck.checked) {
-        alert("You must agree to the Terms & Conditions to create an account.");
-        return;
-    }
-
-    const btn = mode === "create" ? createAccBtnEl : loginBtnEl;
-    let originalText = "";
-    let originalDisabled = false;
-    
-    if (btn) {
-        originalText = btn.textContent;
-        originalDisabled = btn.disabled;
-        btn.textContent = mode === "create" ? "Creating Account..." : "Sending Login Code...";
-        btn.disabled = true;
     }
 
     systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
-    pendingRegistrationData = { email, password: pass, mode };
+    pendingRegistrationData = { email, password, mode };
 
     try {
-        await sendOtpViaEmail(email, systemGeneratedOtp, mode);
-    } catch (error) {
-        console.error("Auth Exception:", error);
-        alert("Error during processing: " + error.message);
-        if (btn) {
-            btn.textContent = originalText;
-            btn.disabled = originalDisabled;
-        }
+        await sendOtpViaEmail(email, systemGeneratedOtp);
+    } catch (err) {
+        alert(err.message);
     }
 }
 
-// --- LOGIN INTERFACE EVENT BINDINGS ---
+// ======================================================
+// LOGIN LISTENERS
+// ======================================================
 function setupLoginInterfaceListeners() {
-    const passwordInput = document.getElementById('password');
-    const createAccBtnEl = document.getElementById('createAccBtn');
-    const loginBtnEl = document.getElementById('loginBtn');
-    const agreeCheck = document.getElementById('agreeCheck');
-    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-    const eyeIcon = document.getElementById('eyeIcon');
-    const strengthBar = document.getElementById('strengthBar');
-    const strengthText = document.getElementById('strengthText');
-    const ruleLength = document.getElementById('ruleLength');
-    const ruleUppercase = document.getElementById('ruleUppercase');
-    const ruleSpecial = document.getElementById('ruleSpecial');
-    
-    const termsLink = document.getElementById('termsLink');
-    const termsModal = document.getElementById('termsModal');
-    const closeTermsBtn = document.getElementById('closeTermsBtn');
-    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
+    const createBtn = document.getElementById('createAccBtn');
+    const loginBtn = document.getElementById('loginBtn');
 
-    // FIX: Optimized and robust input type hide/unhide toggler engine
-    if (togglePasswordBtn && passwordInput) {
-        togglePasswordBtn.onclick = (e) => {
+    if (createBtn) {
+        createBtn.onclick = (e) => {
             e.preventDefault();
-            const currentType = passwordInput.getAttribute('type');
-            if (currentType === 'password') {
-                passwordInput.setAttribute('type', 'text');
-                if (eyeIcon) {
-                    eyeIcon.classList.remove('fa-eye');
-                    eyeIcon.classList.add('fa-eye-slash');
-                }
-            } else {
-                passwordInput.setAttribute('type', 'password');
-                if (eyeIcon) {
-                    eyeIcon.classList.remove('fa-eye-slash');
-                    eyeIcon.classList.add('fa-eye');
-                }
-            }
+            handleAuth("create");
         };
     }
 
-    const updateRuleStyle = (el, condition) => {
-        if (!el) return;
-        const icon = el.querySelector('i');
-        if (condition) {
-            el.classList.add('text-emerald-400');
-            el.classList.remove('text-gray-400');
-            if (icon) icon.className = 'fa-solid fa-circle-check text-[10px]';
-        } else {
-            el.classList.remove('text-emerald-400');
-            el.classList.add('text-gray-400');
-            if (icon) icon.className = 'fa-solid fa-circle text-[6px]';
-        }
-    };
-
-    if (passwordInput) {
-        passwordInput.oninput = () => {
-            const val = passwordInput.value;
-            const { hasLength, hasUppercase, hasSpecial } = validatePassword(val);
-            updateRuleStyle(ruleLength, hasLength);
-            updateRuleStyle(ruleUppercase, hasUppercase);
-            updateRuleStyle(ruleSpecial, hasSpecial);
-
-            const score = (hasLength ? 1 : 0) + (hasUppercase ? 1 : 0) + (hasSpecial ? 1 : 0);
-            
-            if (strengthBar && strengthText) {
-                if (val.length === 0) {
-                    strengthBar.style.width = "0%";
-                    strengthBar.style.backgroundColor = "#ef4444";
-                    strengthText.textContent = "Strength: Empty";
-                } else if (score === 3) {
-                    strengthBar.style.width = "100%";
-                    strengthBar.style.backgroundColor = "#10b981";
-                    strengthText.textContent = "Strength: Strong ✓";
-                } else if (score === 2) {
-                    strengthBar.style.width = "66%";
-                    strengthBar.style.backgroundColor = "#f59e0b";
-                    strengthText.textContent = "Strength: Medium";
-                } else {
-                    strengthBar.style.width = "33%";
-                    strengthBar.style.backgroundColor = "#ef4444";
-                    strengthText.textContent = "Strength: Weak";
-                }
-            }
-        };
-    }
-
-    if (termsLink && termsModal) {
-        termsLink.onclick = (e) => { 
-            e.preventDefault(); 
-            e.stopPropagation();
-            termsModal.classList.remove('hidden'); 
-        };
-    }
-    
-    if (closeTermsBtn && termsModal) {
-        closeTermsBtn.onclick = (e) => { 
-            e.preventDefault();
-            termsModal.classList.add('hidden'); 
-        };
-    }
-    
-    if (acceptTermsBtn && termsModal && agreeCheck) {
-        acceptTermsBtn.onclick = (e) => { 
-            e.preventDefault();
-            agreeCheck.checked = true; 
-            termsModal.classList.add('hidden'); 
-        };
-    }
-
-    if (createAccBtnEl) {
-        createAccBtnEl.onclick = (e) => { 
-            e.preventDefault(); 
-            handleAuth('create'); 
-        };
-    }
-    
-    if (loginBtnEl) {
-        loginBtnEl.onclick = (e) => {
+    if (loginBtn) {
+        loginBtn.onclick = (e) => {
             e.preventDefault();
             handleAuth("login");
         };
