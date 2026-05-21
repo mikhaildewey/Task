@@ -220,29 +220,33 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // --- ABSOLUTE SHUTDOWN LOGOUT ROUTER ---
+    // --- ABSOLUTE SHUTDOWN LOGOUT ROUTER (FIXED FOR GITHUB PAGES) ---
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
-                // 1. Tell Firebase to destroy the secure session token
+                // 1. Tell Firebase to clear the secure user session
                 await signOut(auth);
                 
-                // 2. Stop the live database listener (prevents background errors)
+                // 2. Safely close your real-time database listener
                 if (snapshotUnsubscribe) {
                     snapshotUnsubscribe();
                     snapshotUnsubscribe = null;
                 }
 
-                // 3. Force the browser to redirect to the login page safely
-                window.location.replace("LOGIN.html"); 
+                // 3. Dynamic GitHub Pages routing string calculation
+                const currentPath = window.location.pathname; // Gets '/repo-name/dashboard.html'
+                
+                // CRITICAL: Change "LOGIN.html" below to "login.html" if your file is lowercase on GitHub!
+                const targetLoginPath = currentPath.replace("dashboard.html", "index.html"); 
+                
+                // 4. Force browser redirect using the absolute web origin
+                window.location.href = window.location.origin + targetLoginPath;
                 
             } catch (error) {
-                console.error("Logout failed:", error);
-                // Fallback: If Firebase bugs out, force the redirect anyway
-                window.location.href = "LOGIN.html";
+                console.error("Logout navigation processing error:", error);
+                // Hard fallback attempt
+                window.location.href = "index.html";
             }
-        };
-    }
 
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
