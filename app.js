@@ -373,8 +373,8 @@ function setupRealtimeTasks(userEmail) {
     try {
         const q = query(
             collection(db, "tasks"), 
-            where("userEmail", "==", userEmail),
-            orderBy("createdAt", "desc")
+            where("userEmail", "==", userEmail)
+            // Removed orderBy - will sort on client side instead
         );
 
         snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -384,11 +384,25 @@ function setupRealtimeTasks(userEmail) {
             cachedTasksArray = []; 
             let total = 0, completedCount = 0, pendingCount = 0;
 
+            // Collect all tasks first
+            const allTasks = [];
             snapshot.forEach((docSnapshot) => {
                 const task = docSnapshot.data();
                 const id = docSnapshot.id;
+                allTasks.push({ id, ...task });
+            });
 
-                cachedTasksArray.push({ id, ...task });
+            // Sort by createdAt descending on client side
+            allTasks.sort((a, b) => {
+                const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                return bTime - aTime;
+            });
+
+            // Now render the sorted tasks
+            allTasks.forEach((task) => {
+                const id = task.id;
+                cachedTasksArray.push(task);
 
                 total++;
                 if (task.completed) completedCount++; else pendingCount++;
