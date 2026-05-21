@@ -280,6 +280,9 @@ function closeModal(modalId) {
     }
 }
 
+window.openModal = openModal;
+window.closeModal = closeModal;
+
 // ======================================================
 // INJECT MODULAR COMPONENT INTERFACES
 // ======================================================
@@ -420,77 +423,153 @@ function setupModuleSubmissionListeners() {
 
     const closeRemindersModalBtn = document.getElementById('closeRemindersModalBtn');
     if (closeRemindersModalBtn) closeRemindersModalBtn.onclick = () => closeModal('modRemindersModal');
+    const closeRemindersBtn = document.getElementById('closeRemindersBtn');
+    if (closeRemindersBtn) closeRemindersBtn.onclick = () => closeModal('modRemindersModal');
 
     const closeInboxModalBtn = document.getElementById('closeInboxModalBtn');
     if (closeInboxModalBtn) closeInboxModalBtn.onclick = () => closeModal('modInboxModal');
+    const closeInboxBtn = document.getElementById('closeInboxBtn');
+    if (closeInboxBtn) closeInboxBtn.onclick = () => closeModal('modInboxModal');
 
     // --- Submit Basic Task (My Tasks) ---
     const modSubmitTaskBtn = document.getElementById('modSubmitTaskBtn');
     if (modSubmitTaskBtn) {
         modSubmitTaskBtn.onclick = async () => {
-        const taskId = document.getElementById('modTaskId').value;
-        const title = document.getElementById('modTaskTitle').value.trim();
-        const category = document.getElementById('modTaskCategory').value;
+            const taskId = document.getElementById('modTaskId').value;
+            const title = document.getElementById('modTaskTitle').value.trim();
+            const category = document.getElementById('modTaskCategory').value;
 
-        if (!title) {
-            alert("Task objective cannot be blank.");
-            return;
-        }
-
-        try {
-            if (taskId) {
-                await updateDoc(doc(db, "tasks", taskId), {
-                    title: title,
-                    category: category
-                });
-            } else {
-                await addDoc(collection(db, "tasks"), {
-                    userEmail: auth.currentUser.email,
-                    title: title,
-                    category: category,
-                    date: null,
-                    time: null,
-                    reminderDateTime: null,
-                    reminderTriggered: false,
-                    completed: false,
-                    createdAt: new Date()
-                });
+            if (!title) {
+                alert("Task objective cannot be blank.");
+                return;
             }
 
-            resetTaskModalState();
-            closeModal('modTasksModal');
-            renderTaskList(cachedTasksArray);
-        } catch (err) {
-            alert(err.message);
-        }
-    };
+            try {
+                if (taskId) {
+                    await updateDoc(doc(db, "tasks", taskId), {
+                        title: title,
+                        category: category
+                    });
+
+                    const existingTask = cachedTasksArray.find(item => item.id === taskId);
+                    if (existingTask) {
+                        existingTask.title = title;
+                        existingTask.category = category;
+                    }
+                } else {
+                    const docRef = await addDoc(collection(db, "tasks"), {
+                        userEmail: auth.currentUser.email,
+                        title: title,
+                        category: category,
+                        date: null,
+                        time: null,
+                        reminderDateTime: null,
+                        reminderTriggered: false,
+                        completed: false,
+                        createdAt: new Date()
+                    });
+
+                    cachedTasksArray.push({
+                        id: docRef.id,
+                        userEmail: auth.currentUser.email,
+                        title: title,
+                        category: category,
+                        date: null,
+                        time: null,
+                        reminderDateTime: null,
+                        reminderTriggered: false,
+                        completed: false,
+                        createdAt: new Date()
+                    });
+                }
+
+                resetTaskModalState();
+                closeModal('modTasksModal');
+                refreshTaskDisplay();
+            } catch (err) {
+                alert(err.message);
+            }
+        };
+    }
 
     // --- Update Task with Schedule (Calendar) ---
-    document.getElementById('modSubmitScheduleBtn').onclick = async () => {
-        const taskId = document.getElementById('modCalendarTaskSelect').value;
-        const date = document.getElementById('modCalendarDate').value;
-        const time = document.getElementById('modCalendarTime').value;
+    const modSubmitScheduleBtn = document.getElementById('modSubmitScheduleBtn');
+    if (modSubmitScheduleBtn) {
+        modSubmitScheduleBtn.onclick = async () => {
+            const taskId = document.getElementById('modCalendarTaskSelect').value;
+            const date = document.getElementById('modCalendarDate').value;
+            const time = document.getElementById('modCalendarTime').value;
 
-        if (!taskId || !date || !time) {
-            alert("Please select a task and set both date and time.");
-            return;
-        }
+            if (!taskId || !date || !time) {
+                alert("Please select a task and set both date and time.");
+                return;
+            }
 
-        const combinedDateTime = `${date}T${time}:00`;
+            const combinedDateTime = `${date}T${time}:00`;
 
-        try {
-            await updateDoc(doc(db, "tasks", taskId), {
-                date: date,
-                time: new Date(combinedDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                reminderDateTime: combinedDateTime,
-                reminderTriggered: false
-            });
+            try {
+                await updateDoc(doc(db, "tasks", taskId), {
+                    date: date,
+                    time: new Date(combinedDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    reminderDateTime: combinedDateTime,
+                    reminderTriggered: false
+                });
 
-            closeModal('modCalendarModal');
-        } catch (err) {
-            alert(err.message);
-        }
+                closeModal('modCalendarModal');
+            } catch (err) {
+                alert(err.message);
+            }
+        };
+    }
+}
+
+async function applyCalendarScheduleIfReady() {
+    const taskSelect = document.getElementById('modCalendarTaskSelect');
+    const dateInput = document.getElementById('modCalendarDate');
+    const timeInput = document.getElementById('modCalendarTime');
+
+    const taskId = taskSelect?.value;
+    const date = dateInput?.value;
+    const time = timeInput?.value;
+
+    if (!taskId || !date || !time) {
+        return false;
+    }
+
+    const combinedDateTime = `${date}T${time}:00`;
+
+    try {
+        await updateDoc(doc(db, "tasks", taskId), {
+            date: date,
+            time: new Date(combinedDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            reminderDateTime: combinedDateTime,
+            reminderTriggered: false
+        });
+
+        closeModal('modCalendarModal');
+        return true;
+    } catch (err) {
+        alert(err.message);
+        return false;
+    }
+}
+
+function bindCalendarAutoCloseInputs() {
+    const dateInput = document.getElementById('modCalendarDate');
+    const timeInput = document.getElementById('modCalendarTime');
+    const taskSelect = document.getElementById('modCalendarTaskSelect');
+
+    const maybeAutoClose = async () => {
+        if (!dateInput || !timeInput || !taskSelect) return;
+        if (!dateInput.value || !timeInput.value || !taskSelect.value) return;
+        await applyCalendarScheduleIfReady();
     };
+
+    [dateInput, timeInput, taskSelect].forEach(element => {
+        if (element) {
+            element.addEventListener('change', maybeAutoClose);
+        }
+    });
 }
 
 // ======================================================
@@ -649,6 +728,11 @@ function updateTaskStats(tasks) {
     if (badgeEl) badgeEl.textContent = total;
 }
 
+function refreshTaskDisplay() {
+    updateTaskStats(cachedTasksArray);
+    renderTaskList(cachedTasksArray);
+}
+
 function renderTaskList(tasks) {
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
@@ -724,8 +808,12 @@ function setupDashboardInterfaceListeners() {
     filterButtons.forEach(filter => {
         const btn = document.getElementById(filter.id);
         if (!btn) return;
+        btn.type = 'button';
         btn.onclick = () => setActiveTaskFilter(filter.name);
     });
+
+    setActiveTaskFilter(activeTaskFilter);
+    bindCalendarAutoCloseInputs();
 }
 
 // ======================================================
@@ -771,10 +859,18 @@ function attachDynamicItemListeners() {
     document.querySelectorAll('.task-toggle-checkbox').forEach(box => {
         box.onchange = async (e) => {
             const id = e.target.getAttribute('data-id');
+            const checked = e.target.checked;
             try {
                 await updateDoc(doc(db, "tasks", id), {
-                    completed: e.target.checked
+                    completed: checked
                 });
+
+                const task = cachedTasksArray.find(item => item.id === id);
+                if (task) {
+                    task.completed = checked;
+                }
+
+                refreshTaskDisplay();
             } catch (err) {
                 console.error(err);
             }
@@ -795,6 +891,8 @@ function attachDynamicItemListeners() {
             const id = e.target.getAttribute('data-id');
             try {
                 await deleteDoc(doc(db, "tasks", id));
+                cachedTasksArray = cachedTasksArray.filter(item => item.id !== id);
+                refreshTaskDisplay();
             } catch (err) {
                 console.error(err);
             }

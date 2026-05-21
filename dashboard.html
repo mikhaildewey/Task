@@ -120,10 +120,10 @@
                         <i class="fa-solid fa-plus"></i> <span>Add Task</span>
                     </button>
                     <div class="flex bg-[#0F1015] p-1 rounded-xl border border-[#2A2D3E] text-xs">
-                        <button id="filterAll" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-white bg-[#252836] transition">All</button>
-                        <button id="filterWork" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">Work</button>
-                        <button id="filterPersonal" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">Personal</button>
-                        <button id="filterSchool" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">School</button>
+                        <button id="filterAll" type="button" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-white bg-[#252836] transition">All</button>
+                        <button id="filterWork" type="button" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">Work</button>
+                        <button id="filterPersonal" type="button" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">Personal</button>
+                        <button id="filterSchool" type="button" class="filter-btn px-3 py-1.5 rounded-lg font-bold text-gray-400 hover:text-white transition">School</button>
                     </div>
                 </div>
             </div>
@@ -139,7 +139,7 @@
                 <h3 id="modTasksModalTitle" class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-list-check text-emerald-400"></i> Create Task
                 </h3>
-                <button onclick="closeModal('modTasksModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeTasksModalBtn" type="button" onclick="closeModal('modTasksModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <input type="hidden" id="modTaskId" value="">
             <input type="text" id="modTaskTitle" placeholder="Enter task objective..." class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-emerald-500 transition-colors">
@@ -161,7 +161,7 @@
                 <h3 class="text-white text-xl font-bold flex items-center gap-2">
                     <i class="fa-solid fa-calendar-days text-purple-400"></i> Schedule Task
                 </h3>
-                <button onclick="closeModal('modCalendarModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
+                <button id="closeCalendarModalBtn" type="button" onclick="closeModal('modCalendarModal')" class="text-gray-400 hover:text-white transition-colors text-lg"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <label class="block text-xs text-gray-400 mb-1">Target Task</label>
             <select id="modCalendarTaskSelect" class="w-full mb-4 p-3 rounded-lg bg-[#1E2030] text-white border border-[#2A2D3E] focus:outline-none focus:border-purple-500 transition-colors"></select>
