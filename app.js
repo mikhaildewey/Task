@@ -194,6 +194,7 @@ function setupDashboardInterfaceListeners() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
+    const addTaskBtnElement = document.getElementById('addTaskBtn'); // Fresh grab
 
     const jumpToSection = (element) => {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -238,8 +239,9 @@ function setupDashboardInterfaceListeners() {
     }
 
     // --- WORKING LOGOUT ROUTER (FIXED) ---
-    if (logoutBtn) {
-        logoutBtn.onclick = async () => {
+    const logoutBtnElement = document.getElementById('logoutBtn'); // Fresh grab
+    if (logoutBtnElement) {
+        logoutBtnElement.onclick = async () => {
             try {
                 if (snapshotUnsubscribe) {
                     snapshotUnsubscribe();
@@ -279,18 +281,33 @@ function setupDashboardInterfaceListeners() {
         }
     });
 
-    if (addTaskBtn) {
-        addTaskBtn.onclick = async () => {
-            const title = prompt("Enter priority description context:");
-            if (!title || !title.trim()) return;
-            
-            const categoryInput = prompt("Set category tracking domain (Work / Personal):", "Work");
-            let finalCategory = "Work";
-            if(categoryInput && categoryInput.toLowerCase() === 'personal') finalCategory = "Personal";
+    // --- ADD TASK BUTTON HANDLER ---
+    if (addTaskBtnElement) {
+        addTaskBtnElement.onclick = async () => {
+            // Check if user is authenticated
+            if (!auth.currentUser) {
+                alert("You must be logged in to add tasks.");
+                return;
+            }
 
+            // Prompt for task title
+            const title = prompt("Enter task title:");
+            if (!title || !title.trim()) {
+                return;
+            }
+            
+            // Prompt for task category
+            const categoryInput = prompt("Select category:\n\nType 'Work' or 'Personal'", "Work");
+            let finalCategory = "Work";
+            if (categoryInput && categoryInput.toLowerCase() === 'personal') {
+                finalCategory = "Personal";
+            }
+
+            // Format current time
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             try {
+                // Add task to Firestore
                 await addDoc(collection(db, "tasks"), {
                     userEmail: auth.currentUser.email, 
                     title: title.trim(),
@@ -299,8 +316,11 @@ function setupDashboardInterfaceListeners() {
                     completed: false,
                     createdAt: new Date()
                 });
+                
+                alert(`✓ Task "${title.trim()}" created successfully!`);
             } catch (error) {
-                alert("Task Write Blocked: " + error.message);
+                console.error("Task creation error:", error);
+                alert("Error creating task: " + error.message);
             }
         };
     }
