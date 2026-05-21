@@ -105,32 +105,43 @@
         });
 
         passwordInput.addEventListener('input', () => {
-            const val = passwordInput.value;
-            const hasLength = val.length >= 6;
-            const hasUpper = /[A-Z]/.test(val);
-            const hasSpecial = /[!@#$%^&*()-+]/.test(val);
+    const val = passwordInput.value;
+    
+    // 1. Define criteria
+    const hasLength = val.length >= 6;
+    const hasUpper = /[A-Z]/.test(val);
+    const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
 
-            updateRule(rules.length, hasLength);
-            updateRule(rules.upper, hasUpper);
-            updateRule(rules.special, hasSpecial);
+    // 2. Update UI for each rule independently
+    updateRule(rules.length, hasLength);
+    updateRule(rules.upper, hasUpper);
+    updateRule(rules.special, hasSpecial);
 
-            if (val.length === 0) {
-                strengthBar.style.width = "0%";
-                strengthText.textContent = "Strength: Empty";
-            } else if (hasSpecial) {
-                strengthBar.style.width = "100%";
-                strengthBar.style.backgroundColor = "#10b981";
-                strengthText.textContent = "Strength: Strong"; 
-            } else if (hasLength && hasUpper) {
-                strengthBar.style.width = "100%";
-                strengthBar.style.backgroundColor = "#10b981";
-                strengthText.textContent = "Strength: Strong";
-            } else {
-                strengthBar.style.width = "50%";
-                strengthBar.style.backgroundColor = "#f59e0b";
-                strengthText.textContent = "Strength: Medium";
-            }
-        });
+    // 3. Calculate Strength Score (0 to 3)
+    let score = 0;
+    if (hasLength) score++;
+    if (hasUpper) score++;
+    if (hasSpecial) score++;
+
+    // 4. Update UI based on score
+    if (val.length === 0) {
+        strengthBar.style.width = "0%";
+        strengthText.textContent = "Strength: Empty";
+        strengthBar.style.backgroundColor = "#ef4444";
+    } else if (score === 3) {
+        strengthBar.style.width = "100%";
+        strengthBar.style.backgroundColor = "#10b981"; // Green (Strong)
+        strengthText.textContent = "Strength: Strong";
+    } else if (score === 2) {
+        strengthBar.style.width = "66%";
+        strengthBar.style.backgroundColor = "#f59e0b"; // Yellow (Medium)
+        strengthText.textContent = "Strength: Medium";
+    } else {
+        strengthBar.style.width = "33%";
+        strengthBar.style.backgroundColor = "#ef4444"; // Red (Weak)
+        strengthText.textContent = "Strength: Weak";
+    }
+});
 
         function updateRule(element, isValid) {
             const icon = element.querySelector('i');

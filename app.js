@@ -500,7 +500,7 @@ function setupLoginInterfaceListeners() {
     // HIDE/UNHIDE & LIVE PASSWORD INDICATOR STRENGTH TRACKING
     // =========================================================
     const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-    const eyeIcon = document.getElementById('eyeIcon');
+    const eyeIcon = document.getElementById('eyeIcon'); // The <i> element inside your button
     
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
@@ -509,91 +509,60 @@ function setupLoginInterfaceListeners() {
     const ruleUppercase = document.getElementById('ruleUppercase');
     const ruleSpecial = document.getElementById('ruleSpecial');
 
-    if (togglePasswordBtn && passwordInput && eyeIcon) {
-        togglePasswordBtn.onclick = (e) => {
-            e.preventDefault();
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                eyeIcon.className = "fa-solid fa-eye-slash";
-            } else {
-                passwordInput.type = 'password';
-                eyeIcon.className = "fa-solid fa-eye";
-            }
-        };
-    }
+    if (togglePasswordBtn) {
+    togglePasswordBtn.onclick = () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        
+        // Swap between eye and eye-slash
+        eyeIcon.classList.toggle('fa-eye');
+        eyeIcon.classList.toggle('fa-eye-slash');
+    };
+}
 
     if (passwordInput) {
         passwordInput.oninput = () => {
-            const val = passwordInput.value;
+    const val = passwordInput.value;
 
-            // Rules Conditions Verification Check
-            const hasLength = val.length >= 6;
-            const hasUppercase = /[A-Z]/.test(val);
-            const hasSpecial = /[!@#$%^&*()-+]/.test(val); // Strict Special Character Check
+    // Validation Flags
+    const hasLength = val.length >= 6;
+    const hasUppercase = /[A-Z]/.test(val);
+    const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
 
-            // Length checklist rendering update
-            if (hasLength) {
-                ruleLength.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
-                ruleLength.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
-            } else {
-                ruleLength.className = "text-[11px] text-red-400 flex items-center gap-1.5";
-                ruleLength.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
-            }
+    // Update Rule UI
+    const updateRuleStyle = (el, condition) => {
+        el.className = `text-[11px] flex items-center gap-1.5 ${condition ? 'text-emerald-400' : 'text-red-400'}`;
+        el.querySelector('i').className = `fa-solid ${condition ? 'fa-circle-check' : 'fa-circle-xmark'} text-[10px]`;
+    };
 
-            // Uppercase validation check rendering update
-            if (hasUppercase) {
-                ruleUppercase.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
-                ruleUppercase.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
-            } else {
-                ruleUppercase.className = "text-[11px] text-red-400 flex items-center gap-1.5";
-                ruleUppercase.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
-            }
+    updateRuleStyle(ruleLength, hasLength);
+    updateRuleStyle(ruleUppercase, hasUppercase);
+    updateRuleStyle(ruleSpecial, hasSpecial);
 
-            // Special character restriction check rendering update
-            if (hasSpecial || val === "") {
-                ruleSpecial.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
-                ruleSpecial.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
-            } else {
-                ruleSpecial.className = "text-[11px] text-red-400 flex items-center gap-1.5";
-                ruleSpecial.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
-            }
+    // Calculate Score (0-3)
+    let score = 0;
+    if (hasLength) score++;
+    if (hasUppercase) score++;
+    if (hasSpecial) score++;
 
-            // Strength Metric Score Calculation Block
-            let score = 0;
-            if (val.length > 0) score += 1;
-            if (hasLength) score += 1;
-            if (hasUppercase) score += 1;
-            if (hasSpecial && val.length > 0) score += 1;
-
-            // Color status interface renderer pipeline
-            if (val.length === 0) {
-                strengthBar.style.width = "0%";
-                strengthText.textContent = "Strength: Empty";
-                strengthText.className = "text-[10px] text-gray-500 mt-1 font-medium";
-            } else if (score <= 1) {
-                // Instantly turn red if illegal special characters are typed
-                strengthBar.style.width = "25%";
-                strengthBar.className = "h-full bg-red-500 transition-all duration-300";
-                strengthText.textContent = "Strength: Invalid Characters!";
-                strengthText.className = "text-[10px] text-red-400 mt-1 font-medium";
-            } else if (score <= 2) {
-                strengthBar.style.width = "33%";
-                strengthBar.className = "h-full bg-red-500 transition-all duration-300";
-                strengthText.textContent = "Strength: Weak";
-                strengthText.className = "text-[10px] text-red-400 mt-1 font-medium";
-            } else if (score === 3) {
-                strengthBar.style.width = "66%";
-                strengthBar.className = "h-full bg-amber-500 transition-all duration-300";
-                strengthText.textContent = "Strength: Medium";
-                strengthText.className = "text-[10px] text-amber-400 mt-1 font-medium";
-            } else if (score === 4) {
-                strengthBar.style.width = "100%";
-                strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
-                strengthText.textContent = "Strength: Strong & Secure";
-                strengthText.className = "text-[10px] text-emerald-400 mt-1 font-medium";
-            }
-        };
+    // Update Strength Bar & Text
+    if (val.length === 0) {
+        strengthBar.style.width = "0%";
+        strengthText.textContent = "Strength: Empty";
+    } else if (score === 3) {
+        strengthBar.style.width = "100%";
+        strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
+        strengthText.textContent = "Strength: Strong & Secure";
+    } else if (score === 2) {
+        strengthBar.style.width = "66%";
+        strengthBar.className = "h-full bg-amber-500 transition-all duration-300";
+        strengthText.textContent = "Strength: Medium";
+    } else {
+        strengthBar.style.width = "33%";
+        strengthBar.className = "h-full bg-red-500 transition-all duration-300";
+        strengthText.textContent = "Strength: Weak";
     }
+};
 
     // Helper to validate password criteria rule before allowing form submit triggers
     const isPasswordInvalid = (passValue) => {
