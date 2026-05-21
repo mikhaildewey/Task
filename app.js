@@ -679,7 +679,7 @@ function setupLoginInterfaceListeners() {
             
             // BLOCKS REGISTRATION SUBMIT IF USER BROKE CRITERIA RULES
             if (isPasswordInvalid(cleanPassword)) {
-                alert("Please fix your password rules before proceeding!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• No special characters allowed");
+                alert("Please fix your password rules before proceeding!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• Must have an Special character");
                 return;
             }
 
@@ -708,7 +708,7 @@ function setupLoginInterfaceListeners() {
 
             // BLOCKS LOGIN SUBMIT IF USER BROKE CRITERIA RULES
             if (isPasswordInvalid(cleanPassword)) {
-                alert("The entered password does not match system validation formatting constraints!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• No special characters allowed");
+                alert("The entered password does not match system validation formatting constraints!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• Must have an Special character");
                 return;
             }
 
