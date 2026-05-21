@@ -37,27 +37,42 @@ const createAccBtn = document.getElementById('createAccBtn');
 const addTaskBtn = document.getElementById('addTaskBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 
+// --- UNIVERSAL URL ROUTER UTILITY (BUILT FOR GITHUB PAGES) ---
+function safeRedirect(targetPage) {
+    // Dynamically reads the current folder path (handles repository subdirectories perfectly)
+    const currentURL = window.location.href;
+    const urlObj = new URL(currentURL);
+    const pathSegments = urlObj.pathname.split('/');
+    
+    // Replace the last item (the current file) with our target page
+    pathSegments[pathSegments.length - 1] = targetPage;
+    urlObj.pathname = pathSegments.join('/');
+    
+    window.location.replace(urlObj.toString());
+}
+
 // --- CENTRAL AUTH STATE ROUTER PIPELINE ---
 onAuthStateChanged(auth, (user) => {
+    const currentPath = window.location.pathname.toLowerCase();
+    
     if (user) {
-        // Safe navigation logic to prevent circular routing traps
-        const currentPath = window.location.pathname.toLowerCase();
+        // If logged in, don't let them stay on the login screen
         if (currentPath.includes("login.html") || currentPath.endsWith("/")) {
-            window.location.replace("dashboard.html");
+            safeRedirect("dashboard.html");
         }
         
         if (addTaskBtn) {
             const emailDisplay = document.getElementById('userEmail') || document.querySelector('.text-sm.text-gray-400');
             if (emailDisplay) emailDisplay.textContent = user.email;
             initClockUtilities();
-            setupRealtimeTasks(user.email); // CRITICAL: Only retrieve tasks belonging to this user
+            setupRealtimeTasks(user.email); 
             setupDashboardInterfaceListeners();
             injectDynamicFeatureModals(); 
         }
     } else {
-        const currentPath = window.location.pathname.toLowerCase();
+        // If logged out, don't let them view the dashboard
         if (currentPath.includes("dashboard.html")) {
-            window.location.replace("./LOGIN.html");
+            safeRedirect("LOGIN.html"); // Change to "login.html" if your filename is lowercase on GitHub
         }
         if (loginBtn || createAccBtn) {
             setupLoginInterfaceListeners();
@@ -220,32 +235,19 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // --- ABSOLUTE SHUTDOWN LOGOUT ROUTER (FIXED FOR GITHUB PAGES) ---
+    // --- WORKING LOGOUT ROUTER (FIXED) ---
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
-                // 1. Tell Firebase to clear the secure user session
-                await signOut(auth);
-                
-                // 2. Safely close your real-time database listener
                 if (snapshotUnsubscribe) {
                     snapshotUnsubscribe();
                     snapshotUnsubscribe = null;
                 }
-            
-                // 3. Dynamic GitHub Pages routing string calculation
-                const currentPath = window.location.pathname; // Gets '/repo-name/dashboard.html'
-                
-                // CRITICAL: Change "LOGIN.html" below to "login.html" if your file is lowercase on GitHub!
-                const targetLoginPath = currentPath.replace("dashboard.html", "index.html"); 
-                
-                // 4. Force browser redirect using the absolute web origin
-                window.location.href = window.location.origin + targetLoginPath;
-                
-            } catch (error) {
-                console.error("Logout navigation processing error:", error);
-                // Hard fallback attempt
-                window.location.href = "index.html";
+                await signOut(auth);
+                safeRedirect("LOGIN.html"); // Change to "login.html" if your filename is lowercase on GitHub
+            } catch (err) {
+                console.error("Logout navigation failure:", err);
+                safeRedirect("LOGIN.html");
             }
         };
     }
@@ -287,7 +289,6 @@ function setupDashboardInterfaceListeners() {
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             try {
-                // ADDED: Saving the task with the creator's logged-in email identifier
                 await addDoc(collection(db, "tasks"), {
                     userEmail: auth.currentUser.email, 
                     title: title.trim(),
@@ -304,14 +305,12 @@ function setupDashboardInterfaceListeners() {
 }
 
 // --- DATA READ QUERY RENDERING PIPELINE STREAM ---
-// MODIFIED: Takes the current user's email to fetch and isolate their unique data partition
 function setupRealtimeTasks(userEmail) {
     if (snapshotUnsubscribe) snapshotUnsubscribe(); 
 
     const taskList = document.getElementById('taskList');
     if (!taskList) return;
 
-    // SECURE FIX: Using Firestore 'where' clause to isolate tasks to the individual user
     const q = query(
         collection(db, "tasks"), 
         where("userEmail", "==", userEmail),
@@ -369,7 +368,7 @@ function setupRealtimeTasks(userEmail) {
         }
         attachDynamicItemListeners();
     }, (error) => {
-        console.error("Firestore loading error. Check if Index is deploying:", error);
+        console.error("Firestore loading error:", error);
     });
 }
 
@@ -477,26 +476,25 @@ function setupLoginInterfaceListeners() {
         }
     }
 
-    // UTILITY: Dispatches the real OTP email using the EmailJS integration
     const sendOtpViaEmail = (recipientEmail, otpCode, actionButton) => {
-        // --- CONFIGURE YOUR ACCOUNT IDs HERE ---
-        const SERVICE_ID = "service_u4kqk8s"; // From the 'Email Services' tab
-        const TEMPLATE_ID = "template_enyyyzs"; // From the 'Email Templates' tab
+        // --- PUT YOUR UNIQUE EMAILJS SERVICE AND TEMPLATE ID'S HERE ---
+        const SERVICE_ID = "YOUR_EMAILJS_SERVICE_ID"; 
+        const TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
 
         const templateParams = {
             to_email: recipientEmail,
-            otp_code: otpCode  // <--- This is the specific name of your variable!
-      };
+            otp_code: otpCode
+        };
 
         emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
             .then(() => {
-                alert(`A secure verification code has been dispatched to ${recipientEmail}. Please check your inbox or spam folder.`);
+                alert(`A secure verification code has been dispatched to ${recipientEmail}. Please check your inbox.`);
                 document.getElementById('otpModal').classList.remove('hidden');
                 const firstBox = document.querySelector('.otp-box');
                 if (firstBox) firstBox.focus();
             })
             .catch((err) => {
-                alert("Failed to send verification email. Error details: " + JSON.stringify(err));
+                alert("Failed to send verification email: " + JSON.stringify(err));
             })
             .finally(() => {
                 actionButton.textContent = pendingRegistrationData.mode === 'create' ? "Create Account" : "Login";
