@@ -49,15 +49,14 @@ onAuthStateChanged(auth, (user) => {
             injectDynamicFeatureModals(); 
         }
     } else {
-        // CRITICAL FIX: Match the exact uppercase filename 'LOGIN.html' to prevent 404 errors on logout
+        // Fallback relative route ensures both local server and github pages resolve safely
         if (addTaskBtn || logoutBtn) {
-            window.location.replace("LOGIN.html");
+            window.location.replace("./LOGIN.html");
         }
         if (loginBtn || createAccBtn) {
             setupLoginInterfaceListeners();
         }
     }
-});
 
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
