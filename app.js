@@ -523,22 +523,15 @@ function setupLoginInterfaceListeners() {
     if (passwordInput) {
         passwordInput.oninput = () => {
     const val = passwordInput.value;
+    const { hasLength, hasUppercase, hasSpecial } = validatePassword(val);
 
-    // Validation Flags
-    const hasLength = val.length >= 6;
-    const hasUppercase = /[A-Z]/.test(val);
-    const hasSpecial = /[!@#$%^&*()\-+]/.test(val);
-
-    // Update Rule UI
-    const updateRuleStyle = (el, condition) => {
-        el.className = `text-[11px] flex items-center gap-1.5 ${condition ? 'text-emerald-400' : 'text-red-400'}`;
-        el.querySelector('i').className = `fa-solid ${condition ? 'fa-circle-check' : 'fa-circle-xmark'} text-[10px]`;
-    };
-
+    // Update the visual icons
     updateRuleStyle(ruleLength, hasLength);
     updateRuleStyle(ruleUppercase, hasUppercase);
     updateRuleStyle(ruleSpecial, hasSpecial);
 
+    // ... (Keep your strength bar code here)
+};
     // Calculate Score (0-3)
     let score = 0;
     if (hasLength) score++;
@@ -565,13 +558,13 @@ function setupLoginInterfaceListeners() {
 };
 
     // Helper to validate password criteria rule before allowing form submit triggers
-    const isPasswordInvalid = (passValue) => {
-        const hasLength = passValue.length >= 6;
-        const hasUppercase = /[A-Z]/.test(passValue);
-        const hasSpecial = /[!@#$%^&*()-+]/.test(passValue);
-        return (!hasLength || !hasUppercase || !hasSpecial);
+    const validatePassword = (pass) => {
+    return {
+        hasLength: pass.length >= 6,
+        hasUppercase: /[A-Z]/.test(pass),
+        hasSpecial: /[!@#$%^&*()-+]/.test(pass)
     };
-
+};
     // Terms modal handlers
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
@@ -628,39 +621,37 @@ function setupLoginInterfaceListeners() {
         }
     };
 
-    // Create Account handler
-    if (createAccBtnEl) {
-        createAccBtnEl.onclick = (e) => {
-            e.preventDefault();
-            
-            if (!agreeCheck || !agreeCheck.checked) {
-                alert("You must read and agree to the Terms & Conditions to create an account.");
-                return;
-            }
-            
-            const cleanEmail = emailInput.value.trim();
-            const cleanPassword = passwordInput.value.trim();
-            
-            if (!cleanEmail || !cleanPassword) {
-                alert("Please fill in email and password fields.");
-                return;
-            }
-            
-            // BLOCKS REGISTRATION SUBMIT IF USER BROKE CRITERIA RULES
-            if (isPasswordInvalid(cleanPassword)) {
-                alert("Please fix your password rules before proceeding!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• Must have an Special character");
-                return;
-            }
-
-            createAccBtnEl.textContent = "Sending Email Verification...";
-            createAccBtnEl.disabled = true;
-
-            systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
-            pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: 'create' };
-
-            sendOtpViaEmail(cleanEmail, systemGeneratedOtp, 'create');
-        };
+    // Inside setupLoginInterfaceListeners
+const handleAuthAction = (mode) => {
+    const cleanEmail = emailInput.value.trim();
+    const cleanPassword = passwordInput.value.trim();
+    
+    if (!cleanEmail || !cleanPassword) {
+        alert("Please fill in email and password fields.");
+        return;
     }
+
+    // Use our new validator
+    const { hasLength, hasUppercase, hasSpecial } = validatePassword(cleanPassword);
+    
+    if (!hasLength || !hasUppercase || !hasSpecial) {
+        alert("Password does not meet requirements:\n- Min 6 characters\n- Include Uppercase\n- Include Special character");
+        return;
+    }
+
+    // Proceed if valid
+    const btn = mode === 'create' ? createAccBtnEl : loginBtnEl;
+    btn.textContent = "Processing...";
+    btn.disabled = true;
+
+    systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
+    pendingRegistrationData = { email: cleanEmail, password: cleanPassword, mode: mode };
+
+    sendOtpViaEmail(cleanEmail, systemGeneratedOtp, mode);
+};
+
+if (createAccBtnEl) createAccBtnEl.onclick = (e) => { e.preventDefault(); handleAuthAction('create'); };
+if (loginBtnEl) loginBtnEl.onclick = (e) => { e.preventDefault(); handleAuthAction('login'); };
 
     // Login handler
     if (loginBtnEl) {
