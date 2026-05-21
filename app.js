@@ -79,7 +79,7 @@ function safeRedirect(targetPage) {
     window.location.replace(urlObj.toString());
 }
 
-// ======================================================
+// =====================================================
 // AUTH STATE
 // ======================================================
 onAuthStateChanged(auth, (user) => {
