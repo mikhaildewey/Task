@@ -39,12 +39,10 @@ const logoutBtn = document.getElementById('logoutBtn');
 
 // --- UNIVERSAL URL ROUTER UTILITY (BUILT FOR GITHUB PAGES) ---
 function safeRedirect(targetPage) {
-    // Dynamically reads the current folder path (handles repository subdirectories perfectly)
     const currentURL = window.location.href;
     const urlObj = new URL(currentURL);
     const pathSegments = urlObj.pathname.split('/');
     
-    // Replace the last item (the current file) with our target page
     pathSegments[pathSegments.length - 1] = targetPage;
     urlObj.pathname = pathSegments.join('/');
     
@@ -56,7 +54,6 @@ onAuthStateChanged(auth, (user) => {
     const currentPath = window.location.pathname.toLowerCase();
     
     if (user) {
-        // If logged in, don't let them stay on the login screen
         if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
         }
@@ -70,12 +67,10 @@ onAuthStateChanged(auth, (user) => {
             injectDynamicFeatureModals(); 
         }
     } else {
-        // If logged out, don't let them view the dashboard
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
         }
         
-        // Setup login interface if we're on the login/index page
         if (currentPath.includes("index.html") || currentPath.endsWith("/") || currentPath === "") {
             setupLoginInterfaceListeners();
             setupOtpInputsBehavior(); 
@@ -196,7 +191,7 @@ function setupDashboardInterfaceListeners() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
-    const addTaskBtnElement = document.getElementById('addTaskBtn'); // Fresh grab
+    const addTaskBtnElement = document.getElementById('addTaskBtn');
 
     console.log("Dashboard elements found:", {
         mobileMenuBtn: !!mobileMenuBtn,
@@ -247,8 +242,7 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // --- WORKING LOGOUT ROUTER (FIXED) ---
-    const logoutBtnElement = document.getElementById('logoutBtn'); // Fresh grab
+    const logoutBtnElement = document.getElementById('logoutBtn');
     if (logoutBtnElement) {
         logoutBtnElement.onclick = async () => {
             try {
@@ -290,50 +284,29 @@ function setupDashboardInterfaceListeners() {
         }
     });
 
-    // --- ADD TASK BUTTON HANDLER ---
     if (addTaskBtnElement) {
-        console.log("Add task button found and setting up listener");
         addTaskBtnElement.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
             
-            console.log("Add task button clicked");
-            
-            // Check if user is authenticated
             if (!auth.currentUser) {
-                console.log("User not authenticated");
                 alert("You must be logged in to add tasks.");
                 return;
             }
 
-            console.log("User authenticated:", auth.currentUser.email);
-
-            // Prompt for task title
             const title = prompt("Enter task title:");
-            if (!title || !title.trim()) {
-                console.log("No title provided");
-                return;
-            }
+            if (!title || !title.trim()) return;
             
-            console.log("Task title:", title);
-            
-            // Prompt for task category
             const categoryInput = prompt("Select category:\n\nType 'Work' or 'Personal'", "Work");
             let finalCategory = "Work";
             if (categoryInput && categoryInput.toLowerCase() === 'personal') {
                 finalCategory = "Personal";
             }
 
-            console.log("Task category:", finalCategory);
-
-            // Format current time
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             try {
-                console.log("Adding task to Firestore...");
-                
-                // Add task to Firestore
-                const docRef = await addDoc(collection(db, "tasks"), {
+                await addDoc(collection(db, "tasks"), {
                     userEmail: auth.currentUser.email, 
                     title: title.trim(),
                     category: finalCategory,
@@ -341,47 +314,29 @@ function setupDashboardInterfaceListeners() {
                     completed: false,
                     createdAt: new Date()
                 });
-                
-                console.log("Task added successfully with ID:", docRef.id);
                 alert(`✓ Task "${title.trim()}" created successfully!`);
             } catch (error) {
-                console.error("Task creation error:", error);
-                console.error("Error code:", error.code);
-                console.error("Error message:", error.message);
                 alert("Error creating task: " + error.message);
             }
         };
-    } else {
-        console.log("Add task button element not found!");
     }
 }
 
 // --- DATA READ QUERY RENDERING PIPELINE STREAM ---
 function setupRealtimeTasks(userEmail) {
-    console.log("Setting up real-time tasks for user:", userEmail);
-    
     if (snapshotUnsubscribe) snapshotUnsubscribe(); 
 
     const taskList = document.getElementById('taskList');
-    console.log("Task list element found:", !!taskList);
-    
-    if (!taskList) {
-        console.warn("Task list element not found on page!");
-        return;
-    }
+    if (!taskList) return;
 
     try {
-        // Simple query without orderBy to avoid index requirements
         const q = query(collection(db, "tasks"), where("userEmail", "==", userEmail));
 
         snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
-            console.log("Tasks snapshot received, count:", snapshot.size);
-            
             taskList.innerHTML = '';
             cachedTasksArray = []; 
             let total = 0, completedCount = 0, pendingCount = 0;
 
-            // Collect all tasks
             const allTasks = [];
             snapshot.forEach((docSnapshot) => {
                 const task = docSnapshot.data();
@@ -389,14 +344,12 @@ function setupRealtimeTasks(userEmail) {
                 allTasks.push({ id, ...task });
             });
 
-            // Sort by createdAt descending (newest first)
             allTasks.sort((a, b) => {
                 const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt?.toMillis ? a.createdAt.toMillis() : 0);
                 const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt?.toMillis ? b.createdAt.toMillis() : 0);
                 return bTime - aTime;
             });
 
-            // Render sorted tasks
             allTasks.forEach((task) => {
                 const id = task.id;
                 cachedTasksArray.push(task);
@@ -429,7 +382,6 @@ function setupRealtimeTasks(userEmail) {
                 taskList.appendChild(row);
             });
 
-            // Update counters
             if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
             if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
             if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
@@ -440,13 +392,7 @@ function setupRealtimeTasks(userEmail) {
             if (taskList.children.length === 0) {
                 taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
             }
-            
             attachDynamicItemListeners();
-            
-        }, (error) => {
-            console.error("Firestore loading error:", error);
-            console.error("Error code:", error.code);
-            console.error("Error message:", error.message);
         });
     } catch (error) {
         console.error("Error setting up real-time tasks query:", error);
@@ -550,6 +496,113 @@ function setupLoginInterfaceListeners() {
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
+    // =========================================================
+    // HIDE/UNHIDE & LIVE PASSWORD INDICATOR STRENGTH TRACKING
+    // =========================================================
+    const togglePasswordBtn = document.getElementById('togglePasswordBtn');
+    const eyeIcon = document.getElementById('eyeIcon');
+    
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+    
+    const ruleLength = document.getElementById('ruleLength');
+    const ruleUppercase = document.getElementById('ruleUppercase');
+    const ruleSpecial = document.getElementById('ruleSpecial');
+
+    if (togglePasswordBtn && passwordInput && eyeIcon) {
+        togglePasswordBtn.onclick = (e) => {
+            e.preventDefault();
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                eyeIcon.className = "fa-solid fa-eye-slash";
+            } else {
+                passwordInput.type = 'password';
+                eyeIcon.className = "fa-solid fa-eye";
+            }
+        };
+    }
+
+    if (passwordInput) {
+        passwordInput.oninput = () => {
+            const val = passwordInput.value;
+
+            // Rules Conditions Verification Check
+            const hasLength = val.length >= 6;
+            const hasUppercase = /[A-Z]/.test(val);
+            const hasNoSpecial = /^[a-zA-Z0-9]*$/.test(val); // Strict Alpha-Numeric Check (Bawal Special Chars)
+
+            // Length checklist rendering update
+            if (hasLength) {
+                ruleLength.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
+                ruleLength.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
+            } else {
+                ruleLength.className = "text-[11px] text-red-400 flex items-center gap-1.5";
+                ruleLength.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
+            }
+
+            // Uppercase validation check rendering update
+            if (hasUppercase) {
+                ruleUppercase.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
+                ruleUppercase.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
+            } else {
+                ruleUppercase.className = "text-[11px] text-red-400 flex items-center gap-1.5";
+                ruleUppercase.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
+            }
+
+            // Special character restriction check rendering update
+            if (hasNoSpecial || val === "") {
+                ruleSpecial.className = "text-[11px] text-emerald-400 flex items-center gap-1.5";
+                ruleSpecial.querySelector('i').className = "fa-solid fa-circle-check text-[10px]";
+            } else {
+                ruleSpecial.className = "text-[11px] text-red-400 flex items-center gap-1.5";
+                ruleSpecial.querySelector('i').className = "fa-solid fa-circle-xmark text-[10px]";
+            }
+
+            // Strength Metric Score Calculation Block
+            let score = 0;
+            if (val.length > 0) score += 1;
+            if (hasLength) score += 1;
+            if (hasUppercase) score += 1;
+            if (hasNoSpecial && val.length > 0) score += 1;
+
+            // Color status interface renderer pipeline
+            if (val.length === 0) {
+                strengthBar.style.width = "0%";
+                strengthText.textContent = "Strength: Empty";
+                strengthText.className = "text-[10px] text-gray-500 mt-1 font-medium";
+            } else if (!hasNoSpecial) {
+                // Instantly turn red if illegal special characters are typed
+                strengthBar.style.width = "25%";
+                strengthBar.className = "h-full bg-red-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Invalid Characters!";
+                strengthText.className = "text-[10px] text-red-400 mt-1 font-medium";
+            } else if (score <= 2) {
+                strengthBar.style.width = "33%";
+                strengthBar.className = "h-full bg-red-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Weak";
+                strengthText.className = "text-[10px] text-red-400 mt-1 font-medium";
+            } else if (score === 3) {
+                strengthBar.style.width = "66%";
+                strengthBar.className = "h-full bg-amber-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Medium";
+                strengthText.className = "text-[10px] text-amber-400 mt-1 font-medium";
+            } else if (score === 4) {
+                strengthBar.style.width = "100%";
+                strengthBar.className = "h-full bg-emerald-500 transition-all duration-300";
+                strengthText.textContent = "Strength: Strong & Secure";
+                strengthText.className = "text-[10px] text-emerald-400 mt-1 font-medium";
+            }
+        };
+    }
+
+    // Helper to validate password criteria rule before allowing form submit triggers
+    const isPasswordInvalid = (passValue) => {
+        const hasLength = passValue.length >= 6;
+        const hasUppercase = /[A-Z]/.test(passValue);
+        const hasNoSpecial = /^[a-zA-Z0-9]*$/.test(passValue);
+        return (!hasLength || !hasUppercase || !hasNoSpecial);
+    };
+
     // Terms modal handlers
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
@@ -585,7 +638,6 @@ function setupLoginInterfaceListeners() {
             console.log("Email sent successfully:", response);
             alert(`Verification code sent to ${recipientEmail}. Check your email!`);
             
-            // Show OTP modal
             const otpModal = document.getElementById('otpModal');
             if (otpModal) {
                 otpModal.classList.remove('hidden');
@@ -596,7 +648,6 @@ function setupLoginInterfaceListeners() {
             console.error("Email send failed:", error);
             alert("Failed to send verification email. Please try again.");
         } finally {
-            // Re-enable buttons
             if (createAccBtnEl) {
                 createAccBtnEl.textContent = "Create Account";
                 createAccBtnEl.disabled = false;
@@ -626,8 +677,9 @@ function setupLoginInterfaceListeners() {
                 return;
             }
             
-            if (cleanPassword.length < 6) {
-                alert("Password must be at least 6 characters long.");
+            // BLOCKS REGISTRATION SUBMIT IF USER BROKE CRITERIA RULES
+            if (isPasswordInvalid(cleanPassword)) {
+                alert("Please fix your password rules before proceeding!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• No special characters allowed");
                 return;
             }
 
@@ -651,6 +703,12 @@ function setupLoginInterfaceListeners() {
             
             if (!cleanEmail || !cleanPassword) {
                 alert("Please fill in email and password fields.");
+                return;
+            }
+
+            // BLOCKS LOGIN SUBMIT IF USER BROKE CRITERIA RULES
+            if (isPasswordInvalid(cleanPassword)) {
+                alert("The entered password does not match system validation formatting constraints!\n\n• Minimum 6 characters\n• Must have an Uppercase character\n• No special characters allowed");
                 return;
             }
 

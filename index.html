@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-<script type="text/javascript">
-   (function(){
-      // REPLACE THIS STRING WITH YOUR ACTUAL EMAILJS PUBLIC KEY
-      emailjs.init("KticLUmFwZgI6zrUx");
-   })();
-</script>
+    <script type="text/javascript">
+       (function(){
+          // REPLACE THIS STRING WITH YOUR ACTUAL EMAILJS PUBLIC KEY
+          emailjs.init("KticLUmFwZgI6zrUx");
+       })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Task Scheduler - Login</title>
@@ -42,7 +42,27 @@
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                         <i class="fa-solid fa-lock text-sm"></i>
                     </span>
-                    <input type="password" id="password" placeholder="••••••••" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
+                    <input type="password" id="password" placeholder="••••••••" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-10 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
+                    <button type="button" id="togglePasswordBtn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-white transition focus:outline-none">
+                        <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+
+                <div class="w-full bg-[#0F1015] h-1.5 rounded-full mt-2 overflow-hidden border border-[#2A2D3E]">
+                    <div id="strengthBar" class="h-full w-0 transition-all duration-300 bg-red-500"></div>
+                </div>
+                <div id="strengthText" class="text-[10px] text-gray-500 mt-1 font-medium">Strength: Empty</div>
+
+                <div class="mt-3 p-3 bg-[#0F1015] border border-[#2A2D3E] rounded-xl space-y-1">
+                    <div id="ruleLength" class="text-[11px] text-red-400 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-circle-xmark text-[10px]"></i> At least 6 characters
+                    </div>
+                    <div id="ruleUppercase" class="text-[11px] text-red-400 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-circle-xmark text-[10px]"></i> Must contain an Uppercase letter
+                    </div>
+                    <div id="ruleSpecial" class="text-[11px] text-emerald-400 flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-circle-check text-[10px]"></i> No special characters allowed
+                    </div>
                 </div>
             </div>
 
@@ -66,7 +86,6 @@
 
     <div id="termsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden transition-all duration-200">
         <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh] overflow-hidden transform scale-100 transition-transform">
-            
             <div class="p-4 md:p-5 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
                 <h3 class="text-base md:text-lg font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-gavel text-[#7B51D3]"></i> Terms & Conditions Agreement
@@ -97,58 +116,36 @@
             </div>
         </div>
     </div>
-<div id="termsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-    <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[80vh]">
-        <div class="p-4 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
-            <h3 class="text-base font-bold text-white flex items-center gap-2">
-                <i class="fa-solid fa-file-shield text-purple-400"></i> Terms & Conditions
-            </h3>
-            <button type="button" id="closeTermsBtn" class="text-gray-400 hover:text-white transition text-lg px-2">&times;</button>
-        </div>
-        <div class="p-5 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-3 leading-relaxed">
-            <p class="font-semibold text-white">Welcome to SmartTask!</p>
-            <p>By creating an account on this platform, you agree to safely manage your priority tasks and configuration tokens.</p>
-            <p>1. <strong>Data Security:</strong> Your operational data is securely synced and handled via cloud-hosted Firestore data buckets.</p>
-            <p>2. <strong>Account Conduct:</strong> Users are expected to maintain valid credential fields and avoid repetitive high-frequency login failure routing paths.</p>
-            <p>3. <strong>System Fair-Use:</strong> Rate limit guardrails automatically monitor tracking paths to ensure a latency-free dashboard layout environment for all sessions.</p>
-        </div>
-        <div class="p-4 border-t border-[#2A2D3E] flex justify-end gap-2 bg-[#1A1C28]">
-            <button type="button" id="acceptTermsBtn" class="bg-[#7B51D3] hover:bg-[#683eb8] text-white font-bold text-xs px-4 py-2 rounded-xl transition">
-                I Accept & Agree
-            </button>
+
+    <div id="otpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
+            <div class="w-12 h-12 bg-purple-500/10 text-[#9366F9] rounded-full flex items-center justify-center mx-auto text-xl shadow-inner">
+                <i class="fa-solid fa-shield-lock"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-white">Security Verification</h3>
+                <p class="text-xs text-gray-400 mt-1">A 6-digit secure activation OTP code has been issued for your authentication session.</p>
+            </div>
+            
+            <div class="flex justify-center gap-2 my-2" id="otpInputRow">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+                <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button type="button" id="cancelOtpBtn" class="w-1/2 border border-[#2A2D3E] hover:bg-white/5 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition">
+                    Cancel
+                </button>
+                <button type="button" id="verifyOtpBtn" class="w-1/2 bg-[#7B51D3] hover:bg-[#683eb8] text-white text-xs font-bold py-2.5 rounded-xl transition shadow-lg shadow-purple-500/20">
+                    Verify Securely
+                </button>
+            </div>
         </div>
     </div>
-</div>
-
-<div id="otpModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
-    <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
-        <div class="w-12 h-12 bg-purple-500/10 text-[#9366F9] rounded-full flex items-center justify-center mx-auto text-xl shadow-inner">
-            <i class="fa-solid fa-shield-lock"></i>
-        </div>
-        <div>
-            <h3 class="text-lg font-bold text-white">Security Verification</h3>
-            <p class="text-xs text-gray-400 mt-1">A 6-digit secure activation OTP code has been issued for your authentication session.</p>
-        </div>
-        
-        <div class="flex justify-center gap-2 my-2" id="otpInputRow">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-            <input type="text" maxlength="1" class="otp-box w-10 h-12 text-center text-lg font-bold bg-[#0F1015] border border-[#2A2D3E] text-white rounded-xl focus:outline-none focus:border-[#7B51D3] transition" pattern="\d*">
-        </div>
-
-        <div class="flex gap-2 pt-2">
-            <button type="button" id="cancelOtpBtn" class="w-1/2 border border-[#2A2D3E] hover:bg-white/5 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition">
-                Cancel
-            </button>
-            <button type="button" id="verifyOtpBtn" class="w-1/2 bg-[#7B51D3] hover:bg-[#683eb8] text-white text-xs font-bold py-2.5 rounded-xl transition shadow-lg shadow-purple-500/20">
-                Verify Securely
-            </button>
-        </div>
-    </div>
-</div>
 
     <script type="module" src="app.js"></script>
 </body>
