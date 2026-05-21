@@ -220,19 +220,26 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // --- FIX: ABSOLUTE SHUTDOWN LOGOUT ROUTER LINK ---
+    // --- ABSOLUTE SHUTDOWN LOGOUT ROUTER ---
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
+                // 1. Tell Firebase to destroy the secure session token
+                await signOut(auth);
+                
+                // 2. Stop the live database listener (prevents background errors)
                 if (snapshotUnsubscribe) {
                     snapshotUnsubscribe();
                     snapshotUnsubscribe = null;
                 }
-                await signOut(auth);
-                window.location.replace("./LOGIN.html");
-            } catch (err) {
-                console.error("Logout navigation failure:", err);
-                window.location.href = "./LOGIN.html";
+
+                // 3. Force the browser to redirect to the login page safely
+                window.location.replace("LOGIN.html"); 
+                
+            } catch (error) {
+                console.error("Logout failed:", error);
+                // Fallback: If Firebase bugs out, force the redirect anyway
+                window.location.href = "LOGIN.html";
             }
         };
     }
