@@ -244,10 +244,10 @@ function setupDashboardInterfaceListeners() {
                     snapshotUnsubscribe = null;
                 }
                 await signOut(auth);
-                safeRedirect("LOGIN.html"); // Change to "login.html" if your filename is lowercase on GitHub
+                safeRedirect("index.html"); // Change to "login.html" if your filename is lowercase on GitHub
             } catch (err) {
                 console.error("Logout navigation failure:", err);
-                safeRedirect("LOGIN.html");
+                safeRedirect("index.html");
             }
         };
     }
