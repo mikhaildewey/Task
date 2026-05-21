@@ -32,11 +32,6 @@ let cachedTasksArray = [];
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
 
-const loginBtn = document.getElementById('loginBtn');
-const createAccBtn = document.getElementById('createAccBtn');
-const addTaskBtn = document.getElementById('addTaskBtn');
-const logoutBtn = document.getElementById('logoutBtn');
-
 // --- UNIVERSAL URL ROUTER UTILITY (BUILT FOR GITHUB PAGES) ---
 function safeRedirect(targetPage) {
     const currentURL = window.location.href;
@@ -54,21 +49,29 @@ onAuthStateChanged(auth, (user) => {
     const currentPath = window.location.pathname.toLowerCase();
     
     if (user) {
+        // Handle Routing for logged-in users
         if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
-            return; // Stop execution here while the browser navigates!
+            return; 
         }
         
-        if (addTaskBtn) {
-            // ... the rest of your dashboard setup
-        }
+        // --- INITIALIZE DASHBOARD ENGINE ---
+        injectDynamicFeatureModals();
+        initClockUtilities();
+        setupDashboardInterfaceListeners();
+        setupOtpInputsBehavior();
+        setupRealtimeTasks(user.email);
+        
     } else {
+        // Handle Routing for logged-out users
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
-            return; // Stop execution here!
+            return; 
         }
         
-        // ... the rest of your login setup
+        // --- INITIALIZE AUTH ENGINE ---
+        setupLoginInterfaceListeners();
+        setupOtpInputsBehavior();
     }
 });
 
@@ -186,13 +189,6 @@ function setupDashboardInterfaceListeners() {
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
     const addTaskBtnElement = document.getElementById('addTaskBtn');
-
-    console.log("Dashboard elements found:", {
-        mobileMenuBtn: !!mobileMenuBtn,
-        sidebar: !!sidebar,
-        targetBoard: !!targetBoard,
-        addTaskBtn: !!addTaskBtnElement
-    });
 
     const jumpToSection = (element) => {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -417,29 +413,34 @@ function attachDynamicItemListeners() {
 // --- OTP FIELD NAVIGATION ROUTINES ---
 function setupOtpInputsBehavior() {
     const boxes = document.querySelectorAll('.otp-box');
+    if (boxes.length === 0) return;
     
     boxes.forEach((box, idx) => {
         box.oninput = (e) => {
-            // Only allow digits
             box.value = box.value.replace(/[^0-9]/g, '');
-            
-            // Auto-focus to next box
             if (box.value.length === 1 && idx < boxes.length - 1) {
                 boxes[idx + 1].focus(); 
             }
         };
         
         box.onkeydown = (e) => {
-            // Backspace moves to previous box
             if (e.key === "Backspace" && box.value.length === 0 && idx > 0) {
                 boxes[idx - 1].focus(); 
             }
+        };
+
+        // Complete 6-Digit Verification Clipboard Paste Engine
+        box.onpaste = (e) => {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/[^0-9]/g, '').substring(0, 6);
+            const characters = pasteData.split('');
             
-            // Allow pasting full OTP
-            if (e.key === "v" || e.key === "V") {
-                e.preventDefault();
-                // User will need to paste in each field or paste first digit
-            }
+            boxes.forEach((b, i) => {
+                if (characters[i]) {
+                    b.value = characters[i];
+                    if (i < boxes.length - 1) boxes[i + 1].focus();
+                }
+            });
         };
     });
 
@@ -469,13 +470,9 @@ function setupOtpInputsBehavior() {
                     verifyOtpBtn.textContent = "Verifying...";
                     verifyOtpBtn.disabled = true;
                     
-                    console.log("OTP verified! Mode:", pendingRegistrationData.mode);
-                    
                     if (pendingRegistrationData.mode === 'create') {
-                        console.log("Creating user with email:", pendingRegistrationData.email);
                         await createUserWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
                     } else {
-                        console.log("Signing in user with email:", pendingRegistrationData.email);
                         await signInWithEmailAndPassword(auth, pendingRegistrationData.email, pendingRegistrationData.password);
                     }
                     
@@ -525,9 +522,7 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
         
         const otpModal = document.getElementById('otpModal');
         if (otpModal) {
-            // Clear previous OTP values
             document.querySelectorAll('.otp-box').forEach(box => box.value = '');
-            
             otpModal.classList.remove('hidden');
             const firstBox = document.querySelector('.otp-box');
             if (firstBox) firstBox.focus();
@@ -536,7 +531,6 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
         console.error("Email send failed:", error);
         alert("Failed to send verification email.\n\nError: " + error.message + "\n\nPlease try again.");
         
-        // Clear global state on error
         systemGeneratedOtp = null;
         pendingRegistrationData = null;
     }
@@ -558,45 +552,39 @@ async function handleAuth(mode) {
     const email = emailInput.value.trim();
     const pass = passwordInput.value.trim();
     
-    // 1️⃣ Basic validation
     if (!email || !pass) {
         alert("Please fill in email and password fields.");
         return;
     }
 
-    // 2️⃣ Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         alert("Please enter a valid email address.");
         return;
     }
 
-    // 3️⃣ Password complexity validation
     const { hasLength, hasUppercase, hasSpecial } = validatePassword(pass);
     if (!hasLength || !hasUppercase || !hasSpecial) {
-        alert(
-            "Password does not meet requirements:\n- Min 6 characters\n- Include Uppercase\n- Include Special character"
-        );
+        alert("Password does not meet requirements:\n- Min 6 characters\n- Include Uppercase\n- Include Special character");
         return;
     }
 
-    // 4️⃣ Terms validation for account creation
     if (mode === "create" && agreeCheck && !agreeCheck.checked) {
         alert("You must agree to the Terms & Conditions to create an account.");
         return;
     }
 
-    // 5️⃣ Set processing state
     const btn = mode === "create" ? createAccBtnEl : loginBtnEl;
-    const originalText = btn.textContent;
-    const originalDisabled = btn.disabled;
+    let originalText = "";
+    let originalDisabled = false;
     
     if (btn) {
+        originalText = btn.textContent;
+        originalDisabled = btn.disabled;
         btn.textContent = mode === "create" ? "Creating Account..." : "Sending Login Code...";
         btn.disabled = true;
     }
 
-    // 6️⃣ Trigger OTP
     systemGeneratedOtp = Math.floor(100000 + Math.random() * 900000);
     pendingRegistrationData = { email, password: pass, mode };
 
@@ -604,7 +592,6 @@ async function handleAuth(mode) {
         await sendOtpViaEmail(email, systemGeneratedOtp, mode);
     } catch (error) {
         console.error("Auth error:", error);
-        // Restore button state on error
         if (btn) {
             btn.textContent = originalText;
             btn.disabled = originalDisabled;
@@ -616,7 +603,6 @@ async function handleAuth(mode) {
 function setupLoginInterfaceListeners() {
     console.log("Initializing Auth Listeners...");
 
-    const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const createAccBtnEl = document.getElementById('createAccBtn');
     const loginBtnEl = document.getElementById('loginBtn');
@@ -629,17 +615,16 @@ function setupLoginInterfaceListeners() {
     const ruleUppercase = document.getElementById('ruleUppercase');
     const ruleSpecial = document.getElementById('ruleSpecial');
     
-    // Terms modal elements
     const termsLink = document.getElementById('termsLink');
     const termsModal = document.getElementById('termsModal');
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
-    if (togglePasswordBtn) {
+    if (togglePasswordBtn && passwordInput) {
         togglePasswordBtn.onclick = () => {
             const isPassword = passwordInput.getAttribute('type') === 'password';
             passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-            eyeIcon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+            if (eyeIcon) eyeIcon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
         };
     }
 
@@ -649,11 +634,11 @@ function setupLoginInterfaceListeners() {
         if (condition) {
             el.classList.add('text-emerald-400');
             el.classList.remove('text-gray-400');
-            icon.className = 'fa-solid fa-circle-check text-[10px]';
+            if (icon) icon.className = 'fa-solid fa-circle-check text-[10px]';
         } else {
             el.classList.remove('text-emerald-400');
             el.classList.add('text-gray-400');
-            icon.className = 'fa-solid fa-circle text-[6px]';
+            if (icon) icon.className = 'fa-solid fa-circle text-[6px]';
         }
     };
 
@@ -665,7 +650,6 @@ function setupLoginInterfaceListeners() {
             updateRuleStyle(ruleUppercase, hasUppercase);
             updateRuleStyle(ruleSpecial, hasSpecial);
 
-            // Calculate Score (0-3)
             const score = (hasLength ? 1 : 0) + (hasUppercase ? 1 : 0) + (hasSpecial ? 1 : 0);
             
             if (strengthBar && strengthText) {
@@ -690,7 +674,6 @@ function setupLoginInterfaceListeners() {
         };
     }
 
-    // Terms modal handlers
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
             e.preventDefault(); 
@@ -711,7 +694,6 @@ function setupLoginInterfaceListeners() {
         };
     }
 
-    // Create Account Button
     if (createAccBtnEl) {
         createAccBtnEl.onclick = (e) => { 
             e.preventDefault(); 
@@ -719,7 +701,6 @@ function setupLoginInterfaceListeners() {
         };
     }
     
-    // Login Button
     if (loginBtnEl) {
         loginBtnEl.onclick = (e) => {
             e.preventDefault();
