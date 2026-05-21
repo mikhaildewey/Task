@@ -371,11 +371,8 @@ function setupRealtimeTasks(userEmail) {
     }
 
     try {
-        const q = query(
-            collection(db, "tasks"), 
-            where("userEmail", "==", userEmail)
-            // Removed orderBy - will sort on client side instead
-        );
+        // Simple query without orderBy to avoid index requirements
+        const q = query(collection(db, "tasks"), where("userEmail", "==", userEmail));
 
         snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
             console.log("Tasks snapshot received, count:", snapshot.size);
@@ -384,7 +381,7 @@ function setupRealtimeTasks(userEmail) {
             cachedTasksArray = []; 
             let total = 0, completedCount = 0, pendingCount = 0;
 
-            // Collect all tasks first
+            // Collect all tasks
             const allTasks = [];
             snapshot.forEach((docSnapshot) => {
                 const task = docSnapshot.data();
@@ -392,14 +389,14 @@ function setupRealtimeTasks(userEmail) {
                 allTasks.push({ id, ...task });
             });
 
-            // Sort by createdAt descending on client side
+            // Sort by createdAt descending (newest first)
             allTasks.sort((a, b) => {
-                const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-                const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt?.toMillis ? a.createdAt.toMillis() : 0);
+                const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt?.toMillis ? b.createdAt.toMillis() : 0);
                 return bTime - aTime;
             });
 
-            // Now render the sorted tasks
+            // Render sorted tasks
             allTasks.forEach((task) => {
                 const id = task.id;
                 cachedTasksArray.push(task);
@@ -432,25 +429,27 @@ function setupRealtimeTasks(userEmail) {
                 taskList.appendChild(row);
             });
 
-        if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
-        if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
-        if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
-        
-        const badgeTasks = document.getElementById('sideBadgeTasks') || document.querySelector('aside span.bg-\\[\\#252836\\]');
-        if (badgeTasks) badgeTasks.textContent = pendingCount;
+            // Update counters
+            if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
+            if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
+            if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
+            
+            const badgeTasks = document.getElementById('sideBadgeTasks') || document.querySelector('aside span.bg-\\[\\#252836\\]');
+            if (badgeTasks) badgeTasks.textContent = pendingCount;
 
-        if (taskList.children.length === 0) {
-            taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
-        }
-        attachDynamicItemListeners();
+            if (taskList.children.length === 0) {
+                taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
+            }
+            
+            attachDynamicItemListeners();
+            
         }, (error) => {
             console.error("Firestore loading error:", error);
             console.error("Error code:", error.code);
-            alert("Error loading tasks: " + error.message);
+            console.error("Error message:", error.message);
         });
     } catch (error) {
         console.error("Error setting up real-time tasks query:", error);
-        alert("Error setting up task listener: " + error.message);
     }
 }
 
