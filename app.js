@@ -467,8 +467,8 @@ function setupLoginInterfaceListeners() {
     // UTILITY: Dispatches the real OTP email using the EmailJS integration
     const sendOtpViaEmail = (recipientEmail, otpCode, actionButton) => {
         // --- CONFIGURE YOUR ACCOUNT IDs HERE ---
-        const SERVICE_ID = "YOUR_EMAILJS_SERVICE_ID"; 
-        const TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
+        const SERVICE_ID = "service_u4kqk8s"; 
+        const TEMPLATE_ID = "template_enyyyzs";
 
         const templateParams = {
             to_email: recipientEmail,
