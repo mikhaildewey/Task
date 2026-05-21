@@ -603,7 +603,7 @@ function bindCalendarAutoCloseInputs() {
     }
 }
 
-// ======================================================
+// =====================================================
 // BIND FEATURE CARDS DIRECTLY TO INDEPENDENT MODALS
 // ======================================================
 function bindFeatureCardsToModals() {
