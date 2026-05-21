@@ -529,7 +529,7 @@ function setupLoginInterfaceListeners() {
             // Rules Conditions Verification Check
             const hasLength = val.length >= 6;
             const hasUppercase = /[A-Z]/.test(val);
-            const hasNoSpecial = /^[a-zA-Z0-9]*$/.test(val); // Strict Alpha-Numeric Check (Bawal Special Chars)
+            const hasSpecial = /[!@#$%^&*()-+]/.test(val); // Strict Special Character Check
 
             // Length checklist rendering update
             if (hasLength) {
@@ -599,8 +599,8 @@ function setupLoginInterfaceListeners() {
     const isPasswordInvalid = (passValue) => {
         const hasLength = passValue.length >= 6;
         const hasUppercase = /[A-Z]/.test(passValue);
-        const hasNoSpecial = /^[a-zA-Z0-9]*$/.test(passValue);
-        return (!hasLength || !hasUppercase || !hasNoSpecial);
+        const hasSpecial = /[!@#$%^&*()-+]/.test(passValue);
+        return (!hasLength || !hasUppercase || !hasSpecial);
     };
 
     // Terms modal handlers
