@@ -29,7 +29,7 @@
 
         <form class="space-y-4" onsubmit="return false;">
             <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
+                <label for="email" class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                         <i class="fa-solid fa-envelope text-sm"></i>
@@ -39,13 +39,13 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
+                <label for="password" class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                         <i class="fa-solid fa-lock text-sm"></i>
                     </span>
                     <input type="password" id="password" placeholder="••••••••" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-10 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
-                    <button type="button" id="togglePasswordBtn" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-[#7B51D3] transition focus:outline-none cursor-pointer" tabindex="-1">
+                    <button type="button" id="togglePasswordBtn" aria-label="Toggle password visibility" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-[#7B51D3] transition focus:outline-none cursor-pointer">
                         <i class="fa-solid fa-eye" id="eyeIcon" style="font-size: 14px;"></i>
                     </button>
                 </div>
@@ -94,8 +94,8 @@
     </div>
 
     <script>
-        // Local password strength visualization (runs before app.js)
         document.addEventListener('DOMContentLoaded', () => {
+            // --- Password Strength & Toggle Logic ---
             const passwordInput = document.getElementById('password');
             const togglePasswordBtn = document.getElementById('togglePasswordBtn');
             const eyeIcon = document.getElementById('eyeIcon');
@@ -108,7 +108,6 @@
                 special: document.getElementById('ruleSpecial')
             };
 
-            // Toggle password visibility
             if (togglePasswordBtn) {
                 togglePasswordBtn.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -119,7 +118,6 @@
                 });
             }
 
-            // Real-time password strength
             if (passwordInput) {
                 passwordInput.addEventListener('input', () => {
                     const val = passwordInput.value;
@@ -169,6 +167,47 @@
                     element.classList.add('text-gray-400');
                     icon.className = 'fa-solid fa-circle text-[6px]';
                 }
+            }
+
+            // --- OTP Auto-Advance UX Logic ---
+            const otpBoxes = document.querySelectorAll('.otp-box');
+            otpBoxes.forEach((box, index) => {
+                box.addEventListener('input', (e) => {
+                    // Move to next input if a number is typed
+                    if (e.target.value.length === 1 && index < otpBoxes.length - 1) {
+                        otpBoxes[index + 1].focus();
+                    }
+                });
+
+                box.addEventListener('keydown', (e) => {
+                    // Move to previous input on Backspace if current box is empty
+                    if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
+                        otpBoxes[index - 1].focus();
+                    }
+                });
+            });
+
+            // --- Basic Terms Modal Toggle Logic ---
+            const termsModal = document.getElementById('termsModal');
+            const termsLink = document.getElementById('termsLink');
+            const closeTermsBtn = document.getElementById('closeTermsBtn');
+            const acceptTermsBtn = document.getElementById('acceptTermsBtn');
+            const agreeCheck = document.getElementById('agreeCheck');
+
+            if (termsLink) {
+                termsLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    termsModal.classList.remove('hidden');
+                });
+            }
+
+            const closeTerms = () => termsModal.classList.add('hidden');
+            if (closeTermsBtn) closeTermsBtn.addEventListener('click', closeTerms);
+            if (acceptTermsBtn) {
+                acceptTermsBtn.addEventListener('click', () => {
+                    agreeCheck.checked = true; // Auto-check the box when they accept
+                    closeTerms();
+                });
             }
         });
     </script>
