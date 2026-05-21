@@ -232,7 +232,7 @@ function setupDashboardInterfaceListeners() {
                     snapshotUnsubscribe();
                     snapshotUnsubscribe = null;
                 }
-
+            
                 // 3. Dynamic GitHub Pages routing string calculation
                 const currentPath = window.location.pathname; // Gets '/repo-name/dashboard.html'
                 
@@ -247,6 +247,17 @@ function setupDashboardInterfaceListeners() {
                 // Hard fallback attempt
                 window.location.href = "index.html";
             }
+            } else {
+        const currentPath = window.location.pathname.toLowerCase();
+        if (currentPath.includes("dashboard.html")) {
+            // CRITICAL: Ensure this matches your file case string exactly!
+            window.location.replace("LOGIN.html"); 
+        }
+        if (loginBtn || createAccBtn) {
+            setupLoginInterfaceListeners();
+            setupOtpInputsBehavior(); 
+        }
+    }
 
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
