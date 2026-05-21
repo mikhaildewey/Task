@@ -51,6 +51,8 @@ let snapshotUnsubscribe = null;
 let cachedTasksArray = [];
 let reminderCheckInterval = null;
 let submitTaskInProgress = false;
+let lastTaskCreateSignature = '';
+let lastTaskCreateAt = 0;
 
 let systemGeneratedOtp = null;
 let pendingRegistrationData = null;
@@ -438,8 +440,12 @@ function setupModuleSubmissionListeners() {
         const cleanSubmitTaskBtn = modSubmitTaskBtn.cloneNode(true);
         modSubmitTaskBtn.parentNode.replaceChild(cleanSubmitTaskBtn, modSubmitTaskBtn);
         modSubmitTaskBtn = cleanSubmitTaskBtn;
+        modSubmitTaskBtn.type = 'button';
 
-        modSubmitTaskBtn.onclick = async () => {
+        const handleTaskSubmit = async (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
             if (submitTaskInProgress) return;
             submitTaskInProgress = true;
             modSubmitTaskBtn.disabled = true;
@@ -447,6 +453,8 @@ function setupModuleSubmissionListeners() {
             const taskId = document.getElementById('modTaskId').value;
             const title = document.getElementById('modTaskTitle').value.trim();
             const category = document.getElementById('modTaskCategory').value;
+            const signature = `${taskId}|${title}|${category}`;
+            const now = Date.now();
 
             if (!title) {
                 alert("Task objective cannot be blank.");
@@ -454,6 +462,15 @@ function setupModuleSubmissionListeners() {
                 modSubmitTaskBtn.disabled = false;
                 return;
             }
+
+            if (!taskId && signature === lastTaskCreateSignature && now - lastTaskCreateAt < 2000) {
+                submitTaskInProgress = false;
+                modSubmitTaskBtn.disabled = false;
+                return;
+            }
+
+            lastTaskCreateSignature = signature;
+            lastTaskCreateAt = now;
 
             try {
                 if (taskId) {
@@ -490,6 +507,8 @@ function setupModuleSubmissionListeners() {
                 modSubmitTaskBtn.disabled = false;
             }
         };
+
+        modSubmitTaskBtn.addEventListener('click', handleTaskSubmit);
     }
 
     // --- Update Task with Schedule (Calendar) ---
