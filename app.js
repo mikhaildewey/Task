@@ -191,10 +191,19 @@ function triggerFeatureView(featureType) {
 
 // --- DASHBOARD UI INTERFACE LISTENERS ---
 function setupDashboardInterfaceListeners() {
+    console.log("Setting up dashboard interface listeners...");
+    
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
     const targetBoard = document.getElementById('priorityTasksBoard');
     const addTaskBtnElement = document.getElementById('addTaskBtn'); // Fresh grab
+
+    console.log("Dashboard elements found:", {
+        mobileMenuBtn: !!mobileMenuBtn,
+        sidebar: !!sidebar,
+        targetBoard: !!targetBoard,
+        addTaskBtn: !!addTaskBtnElement
+    });
 
     const jumpToSection = (element) => {
         if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -283,18 +292,30 @@ function setupDashboardInterfaceListeners() {
 
     // --- ADD TASK BUTTON HANDLER ---
     if (addTaskBtnElement) {
-        addTaskBtnElement.onclick = async () => {
+        console.log("Add task button found and setting up listener");
+        addTaskBtnElement.onclick = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log("Add task button clicked");
+            
             // Check if user is authenticated
             if (!auth.currentUser) {
+                console.log("User not authenticated");
                 alert("You must be logged in to add tasks.");
                 return;
             }
 
+            console.log("User authenticated:", auth.currentUser.email);
+
             // Prompt for task title
             const title = prompt("Enter task title:");
             if (!title || !title.trim()) {
+                console.log("No title provided");
                 return;
             }
+            
+            console.log("Task title:", title);
             
             // Prompt for task category
             const categoryInput = prompt("Select category:\n\nType 'Work' or 'Personal'", "Work");
@@ -303,12 +324,16 @@ function setupDashboardInterfaceListeners() {
                 finalCategory = "Personal";
             }
 
+            console.log("Task category:", finalCategory);
+
             // Format current time
             const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             try {
+                console.log("Adding task to Firestore...");
+                
                 // Add task to Firestore
-                await addDoc(collection(db, "tasks"), {
+                const docRef = await addDoc(collection(db, "tasks"), {
                     userEmail: auth.currentUser.email, 
                     title: title.trim(),
                     category: finalCategory,
@@ -317,66 +342,81 @@ function setupDashboardInterfaceListeners() {
                     createdAt: new Date()
                 });
                 
+                console.log("Task added successfully with ID:", docRef.id);
                 alert(`✓ Task "${title.trim()}" created successfully!`);
             } catch (error) {
                 console.error("Task creation error:", error);
+                console.error("Error code:", error.code);
+                console.error("Error message:", error.message);
                 alert("Error creating task: " + error.message);
             }
         };
+    } else {
+        console.log("Add task button element not found!");
     }
 }
 
 // --- DATA READ QUERY RENDERING PIPELINE STREAM ---
 function setupRealtimeTasks(userEmail) {
+    console.log("Setting up real-time tasks for user:", userEmail);
+    
     if (snapshotUnsubscribe) snapshotUnsubscribe(); 
 
     const taskList = document.getElementById('taskList');
-    if (!taskList) return;
+    console.log("Task list element found:", !!taskList);
+    
+    if (!taskList) {
+        console.warn("Task list element not found on page!");
+        return;
+    }
 
-    const q = query(
-        collection(db, "tasks"), 
-        where("userEmail", "==", userEmail),
-        orderBy("createdAt", "desc")
-    );
+    try {
+        const q = query(
+            collection(db, "tasks"), 
+            where("userEmail", "==", userEmail),
+            orderBy("createdAt", "desc")
+        );
 
-    snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
-        taskList.innerHTML = '';
-        cachedTasksArray = []; 
-        let total = 0, completedCount = 0, pendingCount = 0;
+        snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
+            console.log("Tasks snapshot received, count:", snapshot.size);
+            
+            taskList.innerHTML = '';
+            cachedTasksArray = []; 
+            let total = 0, completedCount = 0, pendingCount = 0;
 
-        snapshot.forEach((docSnapshot) => {
-            const task = docSnapshot.data();
-            const id = docSnapshot.id;
+            snapshot.forEach((docSnapshot) => {
+                const task = docSnapshot.data();
+                const id = docSnapshot.id;
 
-            cachedTasksArray.push({ id, ...task });
+                cachedTasksArray.push({ id, ...task });
 
-            total++;
-            if (task.completed) completedCount++; else pendingCount++;
+                total++;
+                if (task.completed) completedCount++; else pendingCount++;
 
-            if (currentCategoryFilter !== "All" && task.category !== currentCategoryFilter) return;
-            if (currentSearchQuery && !task.title.toLowerCase().includes(currentSearchQuery)) return;
+                if (currentCategoryFilter !== "All" && task.category !== currentCategoryFilter) return;
+                if (currentSearchQuery && !task.title.toLowerCase().includes(currentSearchQuery)) return;
 
-            const row = document.createElement('div');
-            row.className = `flex items-center justify-between bg-[#1E2030] p-4 rounded-xl mb-1 border border-transparent hover:border-[#7B51D3] transition group ${task.completed ? 'opacity-50' : ''}`;
-            const tagColorClass = task.category === 'Work' ? 'bg-[#7B51D3]/20 text-[#9366F9]' : 'bg-emerald-500/20 text-emerald-400';
+                const row = document.createElement('div');
+                row.className = `flex items-center justify-between bg-[#1E2030] p-4 rounded-xl mb-1 border border-transparent hover:border-[#7B51D3] transition group ${task.completed ? 'opacity-50' : ''}`;
+                const tagColorClass = task.category === 'Work' ? 'bg-[#7B51D3]/20 text-[#9366F9]' : 'bg-emerald-500/20 text-emerald-400';
 
-            row.innerHTML = `
-                <div class="flex items-center space-x-4 flex-1 min-w-0">
-                    <input type="checkbox" data-id="${id}" ${task.completed ? 'checked' : ''} class="task-toggle-checkbox w-5 h-5 rounded bg-[#0F1015] border-gray-600 text-[#7B51D3] focus:ring-[#7B51D3] cursor-pointer accent-[#7B51D3]">
-                    <div class="truncate">
-                        <p class="font-semibold text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-200'} truncate">${task.title}</p>
-                        <p class="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                            <span class="${tagColorClass} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">${task.category}</span>
-                            <span><i class="fa-regular fa-clock mr-1"></i>${task.time}</span>
-                        </p>
+                row.innerHTML = `
+                    <div class="flex items-center space-x-4 flex-1 min-w-0">
+                        <input type="checkbox" data-id="${id}" ${task.completed ? 'checked' : ''} class="task-toggle-checkbox w-5 h-5 rounded bg-[#0F1015] border-gray-600 text-[#7B51D3] focus:ring-[#7B51D3] cursor-pointer accent-[#7B51D3]">
+                        <div class="truncate">
+                            <p class="font-semibold text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-200'} truncate">${task.title}</p>
+                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                                <span class="${tagColorClass} px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">${task.category}</span>
+                                <span><i class="fa-regular fa-clock mr-1"></i>${task.time}</span>
+                            </p>
+                        </div>
                     </div>
-                </div>
-                <button data-id="${id}" class="delete-task-btn text-gray-500 hover:text-red-400 text-xs font-semibold md:opacity-0 group-hover:opacity-100 transition px-2 py-1">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            `;
-            taskList.appendChild(row);
-        });
+                    <button data-id="${id}" class="delete-task-btn text-gray-500 hover:text-red-400 text-xs font-semibold md:opacity-0 group-hover:opacity-100 transition px-2 py-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                `;
+                taskList.appendChild(row);
+            });
 
         if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
         if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
@@ -389,9 +429,15 @@ function setupRealtimeTasks(userEmail) {
             taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No specific tasks created for your account yet.</p>`;
         }
         attachDynamicItemListeners();
-    }, (error) => {
-        console.error("Firestore loading error:", error);
-    });
+        }, (error) => {
+            console.error("Firestore loading error:", error);
+            console.error("Error code:", error.code);
+            alert("Error loading tasks: " + error.message);
+        });
+    } catch (error) {
+        console.error("Error setting up real-time tasks query:", error);
+        alert("Error setting up task listener: " + error.message);
+    }
 }
 
 function attachDynamicItemListeners() {
