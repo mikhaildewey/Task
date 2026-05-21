@@ -46,7 +46,6 @@ function safeRedirect(targetPage) {
         const lastSlashIdx = path.lastIndexOf('/');
         const lastSegment = path.substring(lastSlashIdx + 1);
         
-        // If the last URL segment doesn't contain an extension like '.html', treat it as a folder base
         if (!lastSegment.includes('.')) {
             urlObj.pathname = path + '/' + targetPage;
         } else {
@@ -61,15 +60,15 @@ onAuthStateChanged(auth, (user) => {
     const currentPath = window.location.pathname.toLowerCase();
     
     if (user) {
-        // Reroute authenticated users away from landing/auth views
         if (currentPath.includes("index.html") || currentPath.includes("login.html") || currentPath.endsWith("/")) {
             safeRedirect("dashboard.html");
             return; 
         }
-        // Initialize dynamic real-time features once confirmed inside dashboard
+        
+        // FIX: Update Dashboard UI with real account info once authenticated
+        updateUserAccountUI(user);
         setupRealtimeTasks(user.email);
     } else {
-        // Enforce route protection for protected dashboard areas
         if (currentPath.includes("dashboard.html")) {
             safeRedirect("index.html");
             return; 
@@ -78,13 +77,10 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // --- RUNTIME LIFECYCLE INITIALIZATION ENGINE ---
-// These execute IMMEDIATELY on script injection so the app UI never freezes
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Setup Static Auth View Listeners if present
     setupLoginInterfaceListeners();
     setupOtpInputsBehavior();
 
-    // 2. Setup Dashboard System Modules if present
     const isDashboard = window.location.pathname.toLowerCase().includes("dashboard.html");
     if (isDashboard) {
         injectDynamicFeatureModals();
@@ -92,6 +88,30 @@ document.addEventListener("DOMContentLoaded", () => {
         setupDashboardInterfaceListeners();
     }
 });
+
+// --- FIX: DISPLAY LIVE USER ACCOUNT INFO ---
+function updateUserAccountUI(user) {
+    if (!user) return;
+    
+    // Grabs the part before the '@' sign as a fallback username
+    const username = user.email.split('@')[0]; 
+    
+    // Targets common element patterns for your profile/account button loader
+    const accountElements = [
+        document.getElementById('userAccountName'),
+        document.getElementById('accountInfoBtn'),
+        document.querySelector('.loading-account-info'), 
+        // Handles text nodes inside elements that say "Loading Account Info..."
+        ...Array.from(document.querySelectorAll('*')).filter(el => el.textContent.trim() === "Loading Account Info...")
+    ];
+
+    accountElements.forEach(el => {
+        if (el) {
+            // Replaces loading state with the actual user's email or username
+            el.innerHTML = `<i class="fa-solid fa-user-circle mr-2 text-purple-400"></i> ${username}`;
+        }
+    });
+}
 
 // --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
@@ -524,7 +544,6 @@ async function sendOtpViaEmail(recipientEmail, otpCode, mode) {
         otp_code: otpCode
     };
 
-    // Fail-safe protection if external SDK fails to load globally
     if (typeof emailjs === 'undefined') {
         throw new Error("EmailJS SDK script was not detected in the HTML context.");
     }
@@ -623,11 +642,24 @@ function setupLoginInterfaceListeners() {
     const closeTermsBtn = document.getElementById('closeTermsBtn');
     const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
+    // FIX: Optimized and robust input type hide/unhide toggler engine
     if (togglePasswordBtn && passwordInput) {
-        togglePasswordBtn.onclick = () => {
-            const isPassword = passwordInput.getAttribute('type') === 'password';
-            passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-            if (eyeIcon) eyeIcon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+        togglePasswordBtn.onclick = (e) => {
+            e.preventDefault();
+            const currentType = passwordInput.getAttribute('type');
+            if (currentType === 'password') {
+                passwordInput.setAttribute('type', 'text');
+                if (eyeIcon) {
+                    eyeIcon.classList.remove('fa-eye');
+                    eyeIcon.classList.add('fa-eye-slash');
+                }
+            } else {
+                passwordInput.setAttribute('type', 'password');
+                if (eyeIcon) {
+                    eyeIcon.classList.remove('fa-eye-slash');
+                    eyeIcon.classList.add('fa-eye');
+                }
+            }
         };
     }
 
@@ -677,7 +709,6 @@ function setupLoginInterfaceListeners() {
         };
     }
 
-    // --- INSTANT TERMS & AGREEMENT MODAL HANDLERS ---
     if (termsLink && termsModal) {
         termsLink.onclick = (e) => { 
             e.preventDefault(); 
