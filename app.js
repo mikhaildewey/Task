@@ -478,8 +478,8 @@ function setupLoginInterfaceListeners() {
 
     const sendOtpViaEmail = (recipientEmail, otpCode, actionButton) => {
         // --- PUT YOUR UNIQUE EMAILJS SERVICE AND TEMPLATE ID'S HERE ---
-        const SERVICE_ID = "YOUR_EMAILJS_SERVICE_ID"; 
-        const TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
+        const SERVICE_ID = "service_u4kqk8s"; 
+        const TEMPLATE_ID = "template_enyyyzs";
 
         const templateParams = {
             to_email: recipientEmail,
