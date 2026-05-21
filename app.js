@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ==========================================
-// 1. YOUR FIREBASE CONFIGURATION OBJECT
+// REPLACE WITH YOUR FIREBASE CONFIGURATION OBJECT
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyBw-u4Pzc8zqj4r_Drh6kAY8BIMFcr6gJ8",
@@ -23,12 +23,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Global state trackers for dashboard data filtering
 let currentCategoryFilter = "All";
 let currentSearchQuery = "";
 let snapshotUnsubscribe = null;
 
-// Safe DOM Element Detection Flags
 const loginBtn = document.getElementById('loginBtn');
 const createAccBtn = document.getElementById('createAccBtn');
 const addTaskBtn = document.getElementById('addTaskBtn');
@@ -37,14 +35,9 @@ const logoutBtn = document.getElementById('logoutBtn');
 // --- CENTRAL AUTH STATE ROUTER PIPELINE ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        console.log("Auth State: Logged in as ->", user.email);
-        
-        // If user is logged in but sitting on the login screen, teleport them to the dashboard
         if (loginBtn || createAccBtn) {
             window.location.replace("dashboard.html");
         } 
-        
-        // If they are on the dashboard, safely spin up the dashboard subsystems
         if (addTaskBtn) {
             const emailDisplay = document.getElementById('userEmail');
             if (emailDisplay) emailDisplay.textContent = user.email;
@@ -53,68 +46,92 @@ onAuthStateChanged(auth, (user) => {
             setupDashboardInterfaceListeners();
         }
     } else {
-        console.log("Auth State: No active user session.");
-        
-        // If they are unauthenticated but trying to view the dashboard, kick them back to login
         if (addTaskBtn || logoutBtn) {
             window.location.replace("LOGIN.html");
         }
-        
-        // If they are on the login page, spin up the authentication listeners
         if (loginBtn || createAccBtn) {
             setupLoginInterfaceListeners();
         }
     }
 });
 
-// --- LOGIN & REGISTER PAGE LOGIC ---
+// --- LOGIN & REGISTER CONTROL HANDLERS (WITH TERMS CONSTRAINTS) ---
 function setupLoginInterfaceListeners() {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+    const agreeCheck = document.getElementById('agreeCheck');
+    
+    // Modal Element Pointers
+    const termsLink = document.getElementById('termsLink');
+    const termsModal = document.getElementById('termsModal');
+    const closeTermsBtn = document.getElementById('closeTermsBtn');
+    const acceptTermsBtn = document.getElementById('acceptTermsBtn');
 
-    // Handle Login Button Click
-    if (loginBtn) {
-        // Clear any old event listeners by cloning the button node
-        const newLoginBtn = loginBtn.cloneNode(true);
-        loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
-        
-        newLoginBtn.addEventListener('click', async (e) => {
+    // Modal Interaction Control Pipeline
+    if (termsLink && termsModal) {
+        termsLink.onclick = (e) => {
             e.preventDefault();
-            if (!emailInput.value || !passwordInput.value) return alert("Please enter both email and password.");
-            
-            try {
-                newLoginBtn.textContent = "Logging in...";
-                await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                // onAuthStateChanged will automatically redirect to dashboard.html
-            } catch (error) {
-                alert("Login Failed: " + error.message);
-                newLoginBtn.textContent = "Login";
-            }
-        });
+            termsModal.classList.remove('hidden');
+            setTimeout(() => termsModal.classList.add('opacity-100'), 10);
+        };
+
+        const hideModal = () => {
+            termsModal.classList.remove('opacity-100');
+            setTimeout(() => termsModal.classList.add('hidden'), 300);
+        };
+
+        if (closeTermsBtn) closeTermsBtn.onclick = hideModal;
+        if (acceptTermsBtn) {
+            acceptTermsBtn.onclick = () => {
+                if (agreeCheck) agreeCheck.checked = true;
+                hideModal();
+            };
+        }
     }
 
-    // Handle Create Account Button Click
+    // Account Creation Event Handler
     if (createAccBtn) {
         const newCreateBtn = createAccBtn.cloneNode(true);
         createAccBtn.parentNode.replaceChild(newCreateBtn, createAccBtn);
 
-        newCreateBtn.addEventListener('click', async (e) => {
+        newCreateBtn.onclick = async (e) => {
             e.preventDefault();
-            if (!emailInput.value || !passwordInput.value) return alert("Please enter both email and password.");
+            if (!agreeCheck || !agreeCheck.checked) {
+                return alert("You must read and agree to the Terms & Conditions to create an account.");
+            }
+            if (!emailInput.value || !passwordInput.value) return alert("Please fill in email and password fields.");
             
             try {
                 newCreateBtn.textContent = "Creating Account...";
                 await createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-                // onAuthStateChanged will automatically redirect to dashboard.html
             } catch (error) {
                 alert("Registration Failed: " + error.message);
                 newCreateBtn.textContent = "Create Account";
             }
-        });
+        };
+    }
+
+    // Authentication Session Login Event Handler
+    if (loginBtn) {
+        const newLoginBtn = loginBtn.cloneNode(true);
+        loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
+        
+        newLoginBtn.onclick = async (e) => {
+            e.preventDefault();
+            if (!emailInput.value || !passwordInput.value) return alert("Please fill in email and password fields.");
+            
+            try {
+                newLoginBtn.textContent = "Logging in...";
+                await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+            } catch (error) {
+                alert("Login Failed: " + error.message);
+                newLoginBtn.textContent = "Login";
+            }
+        };
     }
 }
 
-// --- TIME UTILITIES CLOCK ROUTINE ---
+// --- TIME CLOCK ROUTINE ---
 function initClockUtilities() {
     const timeEl = document.getElementById('liveTime');
     const dateEl = document.getElementById('liveDate');
@@ -132,8 +149,28 @@ function initClockUtilities() {
 function setupDashboardInterfaceListeners() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const sidebar = document.getElementById('sidebar');
+    const targetBoard = document.getElementById('priorityTasksBoard');
 
-    // Mobile Hamburger Menu Drawer Toggle
+    // Sidebar View Jump Target Elements Anchors Helper Routine
+    const jumpToSection = (element) => {
+        if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // Feature Cards Events Mapping
+    const taskTriggers = ['sideNavTasks', 'featureCardTasks', 'sideNavHome', 'featureCardCalendar', 'featureCardReminders', 'featureCardInbox'];
+    taskTriggers.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.onclick = () => {
+                jumpToSection(targetBoard);
+                if (id.startsWith('featureCard') && id !== 'featureCardTasks') {
+                    alert(`${btn.querySelector('h4').textContent} system utilities are fully synced below inside the Task Manager logs tracker.`);
+                }
+            };
+        }
+    });
+
+    // Mobile Navigation Burger Menu Controller
     if (mobileMenuBtn && sidebar) {
         mobileMenuBtn.onclick = (e) => {
             e.stopPropagation();
@@ -144,12 +181,8 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // Logout Process Button Action
-    if (logoutBtn) {
-        logoutBtn.onclick = () => signOut(auth);
-    }
+    if (logoutBtn) logoutBtn.onclick = () => signOut(auth);
 
-    // Real-time Text Query Search Filter
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.oninput = (e) => {
@@ -158,7 +191,6 @@ function setupDashboardInterfaceListeners() {
         };
     }
 
-    // Filter Buttons UI Mode Switching Actions
     const filters = { 'filterAll': 'All', 'filterWork': 'Work', 'filterPersonal': 'Personal' };
     Object.keys(filters).forEach(id => {
         const btn = document.getElementById(id);
@@ -176,7 +208,6 @@ function setupDashboardInterfaceListeners() {
         }
     });
 
-    // Create New Task Document Entry Dialog
     if (addTaskBtn) {
         addTaskBtn.onclick = async () => {
             const title = prompt("Enter priority description context:");
@@ -214,27 +245,20 @@ function setupRealtimeTasks() {
 
     snapshotUnsubscribe = onSnapshot(q, (snapshot) => {
         taskList.innerHTML = '';
-        
-        let total = 0;
-        let completedCount = 0;
-        let pendingCount = 0;
+        let total = 0, completedCount = 0, pendingCount = 0;
 
         snapshot.forEach((docSnapshot) => {
             const task = docSnapshot.data();
             const id = docSnapshot.id;
 
             total++;
-            if (task.completed) completedCount++;
-            else pendingCount++;
+            if (task.completed) completedCount++; else pendingCount++;
 
-            // Evaluate Filter Matrices
             if (currentCategoryFilter !== "All" && task.category !== currentCategoryFilter) return;
             if (currentSearchQuery && !task.title.toLowerCase().includes(currentSearchQuery)) return;
 
-            // Generate Task List Rows
             const row = document.createElement('div');
             row.className = `flex items-center justify-between bg-[#1E2030] p-4 rounded-xl mb-1 border border-transparent hover:border-[#7B51D3] transition group ${task.completed ? 'opacity-50' : ''}`;
-            
             const tagColorClass = task.category === 'Work' ? 'bg-[#7B51D3]/20 text-[#9366F9]' : 'bg-emerald-500/20 text-emerald-400';
 
             row.innerHTML = `
@@ -255,7 +279,6 @@ function setupRealtimeTasks() {
             taskList.appendChild(row);
         });
 
-        // Safe Dashboard Metrics Counter Assignments
         if(document.getElementById('totalTasksCount')) document.getElementById('totalTasksCount').textContent = total;
         if(document.getElementById('completedTasksCount')) document.getElementById('completedTasksCount').textContent = completedCount;
         if(document.getElementById('pendingTasksCount')) document.getElementById('pendingTasksCount').textContent = pendingCount;
@@ -264,36 +287,26 @@ function setupRealtimeTasks() {
         if (taskList.children.length === 0) {
             taskList.innerHTML = `<p class="text-gray-500 text-xs text-center py-8">No matching priority items found.</p>`;
         }
-
         attachDynamicItemListeners();
     });
 }
 
 function attachDynamicItemListeners() {
-    // Checkbox State Updates Loop
     document.querySelectorAll('.task-toggle-checkbox').forEach(box => {
         box.onchange = async (e) => {
             const targetId = e.target.getAttribute('data-id');
-            const isChecked = e.target.checked;
             try {
-                await updateDoc(doc(db, "tasks", targetId), { completed: isChecked });
-            } catch (err) {
-                console.error("Task modification failed:", err);
-            }
+                await updateDoc(doc(db, "tasks", targetId), { completed: e.target.checked });
+            } catch (err) { console.error("Task modification failed:", err); }
         };
     });
 
-    // Delete Task Item Row Event Action Loop
     document.querySelectorAll('.delete-task-btn').forEach(btn => {
         btn.onclick = async (e) => {
             e.stopPropagation();
             const targetId = e.currentTarget.getAttribute('data-id');
             if (confirm("Permanently delete this task item?")) {
-                try {
-                    await deleteDoc(doc(db, "tasks", targetId));
-                } catch (err) {
-                    console.error("Deletion failed:", err);
-                }
+                try { await deleteDoc(doc(db, "tasks", targetId)); } catch (err) { console.error("Deletion failed:", err); }
             }
         };
     });

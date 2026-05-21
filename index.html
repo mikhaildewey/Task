@@ -5,30 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Task Scheduler - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-[#0F1015] h-screen flex items-center justify-center font-sans text-white">
+<body class="bg-[#0F1015] h-screen flex items-center justify-center p-4 text-white font-sans relative overflow-hidden">
 
-    <div class="bg-[#1A1C28] p-10 rounded-2xl shadow-xl w-96 flex flex-col items-center">
-        <h1 class="text-2xl font-bold text-center mb-1">Smart Task Scheduler</h1>
-        <p class="text-gray-400 text-sm mb-6 text-center">Organize your tasks smarter.</p>
-
-        <input type="email" id="email" placeholder="Email Address" 
-               class="w-full bg-[#252836] text-white px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-[#7B51D3]">
-        
-        <input type="password" id="password" placeholder="Password" 
-               class="w-full bg-[#252836] text-white px-4 py-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-[#7B51D3]">
-
-        <div class="flex items-center w-full mb-6">
-            <input type="checkbox" id="terms" class="mr-2 rounded bg-[#252836] border-none">
-            <label for="terms" class="text-xs text-gray-400">I agree to <a href="#" class="text-purple-400">Terms & Conditions</a></label>
+    <div class="bg-[#151722] border border-[#2A2D3E] p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl z-10 transition-all">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight mb-1">Smart Task Scheduler</h1>
+            <p class="text-xs text-gray-400">Organize your tasks smarter.</p>
         </div>
 
-        <button id="createAccBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-3 rounded-lg mb-3 transition">
-            Create Account
-        </button>
-        <button id="loginBtn" class="w-full bg-[#10B981] hover:bg-[#0d9488] text-white font-semibold py-3 rounded-lg transition">
-            Login
-        </button>
+        <form class="space-y-4" onsubmit="return false;">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                        <i class="fa-solid fa-envelope text-sm"></i>
+                    </span>
+                    <input type="email" id="email" placeholder="name@example.com" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+                        <i class="fa-solid fa-lock text-sm"></i>
+                    </span>
+                    <input type="password" id="password" placeholder="••••••••" class="w-full bg-[#0F1015] border border-[#2A2D3E] text-white pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:border-[#7B51D3] transition" required>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 py-1">
+                <input type="checkbox" id="agreeCheck" class="w-4 h-4 rounded bg-[#0F1015] border-gray-600 text-[#7B51D3] focus:ring-[#7B51D3] cursor-pointer accent-[#7B51D3]">
+                <label for="agreeCheck" class="text-xs text-gray-400 select-none">
+                    I agree to the <a href="#" id="termsLink" class="text-[#9366F9] hover:underline font-medium">Terms & Conditions</a>
+                </label>
+            </div>
+
+            <div class="pt-2 space-y-3">
+                <button type="button" id="createAccBtn" class="w-full bg-[#7B51D3] hover:bg-[#6a42c0] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md tracking-wide">
+                    Create Account
+                </button>
+                <button type="button" id="loginBtn" class="w-full bg-[#10B981] hover:bg-[#0e9f6e] text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md tracking-wide">
+                    Login
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div id="termsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-[#151722] border border-[#2A2D3E] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh] overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="p-4 md:p-5 border-b border-[#2A2D3E] flex justify-between items-center bg-[#1A1C28]">
+                <h3 class="text-base md:text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-gavel text-[#7B51D3]"></i> Terms & Conditions Agreement
+                </h3>
+                <button id="closeTermsBtn" class="text-gray-400 hover:text-white transition text-lg p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 md:p-6 overflow-y-auto text-xs md:text-sm text-gray-300 space-y-4 leading-relaxed">
+                <p class="font-semibold text-[#9366F9]">Welcome to Smart Task Scheduler!</p>
+                <p>By registering an account profile or using this layout system client workspace, you explicitly agree to comply with and be bound by the operational constraints defined below.</p>
+                
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px] mt-2">1. Account Data Sync Rules</h4>
+                <p>Your authentication credentials and added priority list objects are managed via secure remote Firebase Firestore protocols. You are entirely responsible for local account authorization access maintenance.</p>
+                
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px] mt-2">2. Usage and Limitations</h4>
+                <p>This workspace environment application utility provides priority indexing tracking flags. System components may scale asynchronously based on connection configuration permissions adjustments.</p>
+
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px] mt-2">3. Storage Policies</h4>
+                <p>Data items marked completed or removed from active logging tracks are un-indexed permanently from active tracking metrics counters caches.</p>
+            </div>
+
+            <div class="p-4 border-t border-[#2A2D3E] flex justify-end bg-[#1A1C28]">
+                <button type="button" id="acceptTermsBtn" class="bg-[#7B51D3] hover:bg-[#6a42c0] text-white px-5 py-2 rounded-xl text-xs font-bold transition shadow-md">
+                    I Accept
+                </button>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="app.js"></script>
