@@ -108,19 +108,19 @@
             const val = passwordInput.value;
             const hasLength = val.length >= 6;
             const hasUpper = /[A-Z]/.test(val);
-            const hasSpecial = /[^A-Za-z0-9]/.test(val);
+            const hasSpecial = /[!@#$%^&*()-+]/.test(val);
 
             updateRule(rules.length, hasLength);
             updateRule(rules.upper, hasUpper);
-            updateRule(rules.special, !hasSpecial);
+            updateRule(rules.special, hasSpecial);
 
             if (val.length === 0) {
                 strengthBar.style.width = "0%";
                 strengthText.textContent = "Strength: Empty";
             } else if (hasSpecial) {
-                strengthBar.style.width = "100%";
+                strengthBar.style.width = "25%";
                 strengthBar.style.backgroundColor = "#ef4444";
-                strengthText.textContent = "Strength: Invalid (Special characters found)";
+                strengthText.textContent = "Strength: Strong"; 
             } else if (hasLength && hasUpper) {
                 strengthBar.style.width = "100%";
                 strengthBar.style.backgroundColor = "#10b981";
