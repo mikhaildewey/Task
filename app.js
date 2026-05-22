@@ -153,6 +153,26 @@ function updateUserAccountUI(user) {
 // ======================================================
 // CLOCK & GREETINGS SYNCHRONIZATION
 // ======================================================
+
+function updateDynamicGreeting(hour) {
+    const greetingEl = document.getElementById('greetingMsg');
+    if (!greetingEl) return;
+
+    let greeting = 'Good evening'; // Default for 18 (6 PM) to 4 AM
+    
+    if (hour >= 5 && hour < 12) {
+        greeting = 'Good morning';
+    } else if (hour >= 12 && hour < 18) {
+        greeting = 'Good afternoon';
+    }
+
+    // Optimization: Only update the DOM if the greeting actually changes
+    // This stops the browser from re-rendering this element every second
+    if (greetingEl.textContent !== greeting) {
+        greetingEl.textContent = greeting;
+    }
+}
+
 function initClockUtilities() {
     const timeEl = document.getElementById('liveTime');
     const dateEl = document.getElementById('liveDate');
@@ -181,27 +201,13 @@ function initClockUtilities() {
         updateDynamicGreeting(now.getHours());
     }
 
+    // Run once immediately, then every 1000ms (1 second)
     refreshClock();
     setInterval(refreshClock, 1000);
 }
 
-function updateDynamicGreeting(hour) {
-    const greetingEl = document.getElementById('dynamicGreeting');
-    if (!greetingEl) return;
-
-    let greeting = "Good Evening";
-
-    if (hour >= 5 && hour < 12) {
-        greeting = "Good Morning";
-    } else if (hour >= 12 && hour < 18) {
-        greeting = "Good Afternoon";
-    }
-
-    // Only update the DOM if it actually changes to save resources
-    if (greetingEl.textContent !== greeting) {
-        greetingEl.textContent = greeting;
-    }
-}
+// Make sure the DOM is fully loaded before running the script
+document.addEventListener('DOMContentLoaded', initClockUtilities);
 
 // ======================================================
 // REMINDERS REALTIME CRON
